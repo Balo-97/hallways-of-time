@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#181916">
+  <meta name="description" content="Begin at first light and follow one path through three grand halls: the cosmos, the living Earth, and a room where a giant globe turns under three hundred thousand years of human moments. An immersive museum for desktop and Meta Quest.">
+  <title>Hallways of Time · A Map of Time</title>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="museum.css">
+</head>
+<body>
+  <div id="scene" aria-label="Interactive three-dimensional museum"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <header>
+    <a class="brand" href="../"><span class="brand-icon">Ⅲ</span><span>A Map of Time<small>THE HALLWAYS OF TIME</small></span></a>
+    <nav aria-label="Experience"><a href="../">The timeline</a><span class="active">The museum</span><button id="settings-open" aria-label="Open movement and comfort settings">⚙ <span>Settings</span></button><button id="help" aria-label="Open museum controls">? <span>Guide</span></button></nav>
+  </header>
+  <main id="welcome">
+    <div class="eyebrow"><i></i> ONE PATH. THREE GRAND HALLS.</div>
+    <h1>Walk through<br>the hallways<br>of <em>time.</em></h1>
+    <p>Begin at first light.<br>Follow all 495 moments through the cosmos,<br>the living Earth, and the world we made.</p>
+    <div class="actions"><button class="primary" id="explore" disabled>Preparing your visit…</button><button id="enter-vr" disabled>Checking VR…</button></div>
+    <p class="device-note" id="xr-status" role="status">Explore on your screen, or step inside with Meta Quest.</p>
+    <div class="collection-note"><span>Ⅰ &nbsp; COSMOS</span><span>Ⅱ &nbsp; LIFE</span><span>Ⅲ &nbsp; HUMANITY</span></div>
+  </main>
+  <div class="museum-caption" id="scene-caption"><span>THE ORIGIN CHAMBER</span><p>Every story begins somewhere.</p><i>13.8 billion years unfold from here</i></div>
+  <div id="tour-ui" hidden>
+    <div class="wing-tabs" role="group" aria-label="Travel through time"><button id="origin" title="Return to the origin and replay the cosmic expansion">The beginning</button><button data-wing="0">Ⅰ Cosmos</button><button data-wing="1">Ⅱ Life</button><button data-wing="2">Ⅲ Humanity</button></div>
+    <div class="bottom-stack">
+    <div class="tour-bottom"><div class="current-hall"><small id="wing-number">HALL Ⅰ</small><strong id="wing-title">The Cosmos</strong><span id="exhibit-count"></span><div class="chapter-controls"><button id="chapter-previous" aria-label="Previous chapter">← Chapter</button><button id="chapter-next" aria-label="Next chapter">Next chapter →</button></div><small id="chapter-status">495 entries · Complete collection</small></div><div class="tour-actions"><button id="previous">← Previous moment</button><button id="next">Next moment →</button><button id="catalog">All 495 entries</button><button id="next-hall" class="door-action">Continue to next hall <span aria-hidden="true">↗</span></button></div></div>
+    <div id="globe-ui" hidden>
+      <div class="globe-clock"><small id="globe-band">&nbsp;</small><strong id="globe-date">&nbsp;</strong><span id="globe-live">&nbsp;</span></div>
+      <div class="globe-rail"><div id="rail-bands" aria-hidden="true"></div><div id="rail-dots" aria-hidden="true"></div><div id="rail-window" aria-hidden="true"></div><input id="rail" type="range" min="0" max="10000" step="1" value="10000" aria-label="Travel through three hundred thousand years"></div>
+      <div id="globe-eras" role="group" aria-label="Choose an era"></div>
+      <div class="globe-actions"><button id="globe-rewind" type="button">◀◀ Rewind</button><button id="globe-hold" type="button">Hold</button><button id="globe-play" type="button">Play ▶▶</button><button id="globe-speed" type="button">Speed ×1</button><button id="globe-follow" type="button" aria-pressed="true">Follow: on</button><button id="globe-upright" type="button">Upright view</button><button id="globe-read" type="button">Read this moment</button></div>
+    </div>
+    </div>
+    <div id="hint">Drag to look · WASD to walk · T and H to rise and descend · Select a central exhibit · Click the floor to teleport · Settings for speed</div>
+    <div id="globe-hint">Drag the Earth to turn it · drag the rail to travel through time · comma and full stop step one moment</div>
+    <div class="touch-controls" aria-label="Movement controls"><button data-move="left" aria-label="Move left">←</button><button data-move="forward" aria-label="Move forward">↑</button><button data-move="back" aria-label="Move backward">↓</button><button data-move="right" aria-label="Move right">→</button></div>
+  </div>
+  <dialog id="guide"><button class="close" aria-label="Close guide">×</button><small>YOUR WALK THROUGH TIME</small><h2>First light. Then everything.</h2><p>Begin in the origin chamber and follow the central plinths in chronological order. The doors at the end of each hall open as you approach, leading you onward through the cosmos, life, and humanity.</p><p><b>Desktop</b> — drag to look, use WASD or arrow keys to walk, hold T to rise and H to descend, or click the floor to teleport. Select an exhibit to read its story. Use Previous moment and Next moment to move along the sequence.</p><p><b>Quest</b> — aim either controller and press the trigger to read an exhibit or teleport to the floor. <b>Push the right stick to walk</b>, and move the <b>left stick sideways to turn</b> in 30° steps. Hold <b>Y to rise</b> and <b>X to descend</b> on the left controller. You can explore seated or standing.</p><p><b>Settings</b> — choose your walking speed, how turning works and what moves, from Settings above, or press <b>B</b> on the right controller inside the headset.</p><p><b>The globe room</b> — the Human Story is not a corridor. Hall Ⅲ holds one giant Earth: drag it to turn it, and run the time rail forwards or backwards to watch three hundred thousand years of moments appear where they happened. Seven entries belong to the whole planet and are named above the globe rather than pinned to it.</p><p class="muted">The opening is an artistic visualization of expansion; exhibit spacing is chronological, not proportional. “The beginning” returns you to the origin. All 495 entries are included in chronological chapters of up to 12. Use Next chapter or the desks at either end of a hall to continue its collection. Next moment automatically continues into the next chapter. All 495 entries also opens a complete searchable catalog. Doors let you move directly to the next hall. Dates after the Big Bang use the original timeline’s 13.797-billion-year age.</p><button id="vr-from-guide" class="primary">Enter VR</button><p id="guide-status" role="status"></p></dialog>
+  <dialog id="settings"><button class="close" aria-label="Close settings">×</button><small>HOW YOU MOVE</small><h2>Settings.</h2><p>These apply on screen and inside the headset. Inside the headset, press <b>B</b> on the right controller to open this same menu in front of you.</p>
+    <fieldset id="speed-choice"><legend>Walking speed</legend>
+      <label class="setting"><input type="radio" name="speed" id="speed-slow" value="slow"> <span>Slow<small>1.0 m/s — gentlest</small></span></label>
+      <label class="setting"><input type="radio" name="speed" id="speed-steady" value="steady" checked> <span>Steady<small>1.7 m/s — a walking pace</small></span></label>
+      <label class="setting"><input type="radio" name="speed" id="speed-brisk" value="brisk"> <span>Brisk<small>2.6 m/s — covers a hall quickly</small></span></label>
+    </fieldset>
+    <label class="setting"><input id="smooth-turn" type="checkbox"> Turn smoothly with the left stick, instead of 30° steps</label>
+    <label class="setting"><input id="gentle" type="checkbox"> Still cosmic display at the beginning</label>
+    <label class="setting"><input id="still-sculpture" type="checkbox"> Still the moving sculptures</label>
+    <label class="setting"><input id="sharp-xr" type="checkbox" checked> Sharpest image in the headset (uses more of the headset's power)</label>
+    <small id="sharp-note" class="muted" hidden>The headset was dropping frames, so the image was set back to its standard sharpness. Tick the box to try again next time.</small>
+    <p class="muted">Your choices are remembered on this device. A system request for reduced motion stills both the opening display and the sculpture.</p>
+  </dialog>
+  <dialog id="story"><button class="close" aria-label="Close exhibit">×</button><small id="story-date"></small><h2 id="story-title"></h2><img id="story-art" alt=""><small id="story-credit" class="credit"></small><p id="story-detail"></p><h3>How we know</h3><p id="story-evidence"></p><dl id="story-facts"></dl><button id="narrate">Read aloud</button><p class="muted"><a href="../credits.html" target="_blank" rel="noopener">Picture credits</a> — every photograph, its author and licence. Original timeline text and schematic illustration.</p></dialog>
+  <dialog id="library"><button class="close" aria-label="Close exhibit catalog">×</button><small>THE COMPLETE COLLECTION</small><h2>Find your moment.</h2><input id="query" type="search" placeholder="Search 495 exhibits…" aria-label="Search museum exhibits"><p id="results-count" aria-live="polite"></p><div id="results"></div></dialog>
+  <div id="error" role="alert" hidden></div>
+  <script type="module" src="museum.js"></script>
+</body>
+</html>

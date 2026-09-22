@@ -1,0 +1,16 @@
+{
+  "id":"./vr/",
+  "name":"Hallways of Time",
+  "short_name":"Time Museum",
+  "description":"Walk through the history of the cosmos, life, and humanity in a warm, immersive museum.",
+  "start_url":"./vr/?installed=1",
+  "scope":"./",
+  "display":"standalone",
+  "orientation":"landscape",
+  "background_color":"#181916",
+  "theme_color":"#253127",
+  "icons":[
+    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"}
+  ]
+}
