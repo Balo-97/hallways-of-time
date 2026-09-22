@@ -1,4 +1,4 @@
-const CACHE='hallways-of-time-v28';
+const CACHE='hallways-of-time-v29';
 const SHELL=['./','./vr/','./vr/museum.css','./vr/museum.js','./vr/journey-scene.js','./vr/grand-hall.js','./vr/origin.js','./vr/future-gallery.js','./vr/humanity-globe.js','./vr/coastlines.js','./vr/time-axis.js','./vr/sculptures.js','./vr/imagery.js','./vr/detail.js','./vr/native-plates.js','./data/image-credits.json','./credits.html','./data/events.json','./vendor/three.module.js','./vendor/three.core.js','./assets/icon-192.png','./assets/icon-512.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('hallways-of-time-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

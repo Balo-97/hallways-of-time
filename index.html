@@ -88,6 +88,7 @@ header.mast{
   text-transform:uppercase; color:var(--ash-dim);
 }
 .tools{ display:flex; gap:8px; align-items:center; }
+.tools [hidden]{ display:none; }
 
 button.btn, a.btn{
   font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
@@ -799,8 +800,8 @@ main.swap{ opacity:0; transition:opacity .22s; }
     <a class="btn credits-link" href="terms.html">Terms</a>
     <button class="btn" id="btnFind">Search <kbd>/</kbd></button>
     <button class="btn" id="btnExpand">Expand all</button>
-    <button class="btn" id="btnAdd">Add event</button>
-    <button class="btn" id="btnData">Data</button>
+    <button class="btn" id="btnAdd" hidden>Add event</button>
+    <button class="btn" id="btnData" hidden>Data</button>
   </div>
 </header>
 
@@ -876,6 +877,20 @@ main.swap{ opacity:0; transition:opacity .22s; }
 
 <script>
 "use strict";
+
+/* ═══════════════════════════════════════════════════════════
+   0 · WHOSE MAP IT IS
+   The collection is the curator's work, not the visitor's. A published map is
+   a finished thing: whoever opens it on the web is offered no Add event and no
+   Data, no card offers to be edited, and what it shows is always the events
+   written into this file. Opened from this machine — the dev server on
+   localhost, or the file itself — every tool comes back, which is where the
+   collection is written and exported in the first place.
+   ═══════════════════════════════════════════════════════════ */
+
+const CURATOR = typeof location !== "undefined"           // the build reads this file in Node
+  && (location.protocol === "file:"
+      || ["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname));
 
 /* ═══════════════════════════════════════════════════════════
    1 · CONSTANTS & TIME MATHS
@@ -7589,7 +7604,7 @@ function renderLog(){
         `<div class="prose"><p>${safeHTML(e.detail)}</p>` +
         (e.evidence ? `<div class="ev"><span class="evl">How we know</span><p>${safeHTML(e.evidence)}</p></div>` : "") +
         `<dl class="facts">${facts}</dl>` +
-        `<div class="rowbtn"><button class="btn" type="button" data-edit="${e.id}">Edit this event</button></div>` +
+        (CURATOR ? `<div class="rowbtn"><button class="btn" type="button" data-edit="${e.id}">Edit this event</button></div>` : "") +
         `</div>` +
       `</div>`;
 
@@ -7607,7 +7622,8 @@ function renderLog(){
       const again = log.querySelector('.spec[data-id="' + e.id + '"]');
       if(again) window.scrollBy(0, again.getBoundingClientRect().top - before);
     });
-    card.querySelector("[data-edit]").addEventListener("click", ev => {
+    const edit = card.querySelector("[data-edit]");
+    if(edit) edit.addEventListener("click", ev => {
       ev.stopPropagation(); openEditor(e.id);
     });
 
@@ -7643,11 +7659,14 @@ function renderLog(){
   if(!mine.length){
     const box = document.createElement("div");
     box.className = "empty";
-    box.innerHTML =
-      `<h4>Nothing recorded on this scale yet</h4>` +
-      `<p>The ruler, zones and nesting are already in place. Add the first event and it will find its own depth.</p>` +
-      `<button class="btn solid" type="button">Add the first event</button>`;
-    box.querySelector("button").addEventListener("click", () => openEditor(null));
+    box.innerHTML = CURATOR
+      ? `<h4>Nothing recorded on this scale yet</h4>` +
+        `<p>The ruler, zones and nesting are already in place. Add the first event and it will find its own depth.</p>` +
+        `<button class="btn solid" type="button">Add the first event</button>`
+      : `<h4>Nothing recorded on this scale yet</h4>` +
+        `<p>The ruler, zones and nesting are in place; the entries for this scale are still to come.</p>`;
+    const first = box.querySelector("button");
+    if(first) first.addEventListener("click", () => openEditor(null));
     log.appendChild(box);
     cards.unshift({ el: box, anchor: axis.segs[0].top + 40, trailing: true });
   }
@@ -7909,6 +7928,7 @@ function openDrawer(){ drawer.classList.add("open"); scrim.classList.add("on"); 
 function closeDrawer(){ drawer.classList.remove("open"); scrim.classList.remove("on"); }
 
 function openEditor(id){
+  if(!CURATOR) return;
   const ev = id ? events.find(e => e.id === id) : null;
   $("#drawerTitle").textContent = ev ? "Edit event" : "Add event";
   const n = ev ? norm(ev) : null;
@@ -8002,6 +8022,7 @@ function openEditor(id){
 }
 
 function openData(){
+  if(!CURATOR) return;
   $("#drawerTitle").textContent = "Data";
   const rows = events.slice()
     .map(e => Object.assign({}, e, norm(e)))
@@ -9031,8 +9052,12 @@ $("#btnExpand").addEventListener("click", () => {
   renderLog();
 });
 
-$("#btnAdd").addEventListener("click", () => openEditor(null));
-$("#btnData").addEventListener("click", openData);
+if(CURATOR){
+  $("#btnAdd").hidden = false;
+  $("#btnData").hidden = false;
+  $("#btnAdd").addEventListener("click", () => openEditor(null));
+  $("#btnData").addEventListener("click", openData);
+}
 $("#btnClose").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
 document.addEventListener("keydown", e => { if(e.key === "Escape") closeDrawer(); });
@@ -9047,7 +9072,7 @@ let rt = 0;
 window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { renderLog(); updateGauge(); }, 180); });
 
 (async function init(){
-  await load();
+  if(CURATOR) await load();
   renderNav(); renderPreamble(); renderLog(); updateGauge();
 })();
 </script>
