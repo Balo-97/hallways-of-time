@@ -2,6 +2,7 @@ import * as THREE from '../vendor/three.module.js';
 import {nativePlates} from './native-plates.js';
 import {createJourneyScene,HALL_STEP,STATIONS,stationZ,elapsedSeconds,chronologicalWing,timeSinceBigBang} from './journey-scene.js';
 import {createImagery,creditLine} from './imagery.js';
+import {createInteractiveWing,WING_Z} from './interactive-wing.js';
 const $=s=>document.querySelector(s);
 const WINGS=[
   {key:'cosmic',name:'The Cosmos',roman:'Ⅰ'},
@@ -10,8 +11,10 @@ const WINGS=[
 ];
 // Hall III is a room and the salon beyond it is a fourth space, so which room
 // the visitor stands in is read from the doorways rather than from hall pitch.
-const GLOBE_ROOM=2,FINALE=3;
-const roomAt=z=>z>-76?0:z>-164?1:z>-200?GLOBE_ROOM:FINALE;
+// The interactive museum is a gallery apart, reached by teleporting, far
+// beyond the halls; anything that far along is in it.
+const GLOBE_ROOM=2,FINALE=3,INTERACTIVE=4;
+const roomAt=z=>z>WING_Z-150?INTERACTIVE:z>-76?0:z>-164?1:z>-200?GLOBE_ROOM:FINALE;
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),clock=new THREE.Clock();
 const pickables=[],panels=[],controllers=[],keys=new Set(),visited=new Set();
 const pages=[0,0,0],records=[];
@@ -19,6 +22,8 @@ let renderer,scene,camera,rig,journey,events=[],started=false,currentWing=0,drag
 let storyGroup,storyTargets=[],turnLatched=false,ready=false,lastWing=-1,teleportMarker;
 let menuGroup=null,menuTargets=[],menuLatched=false;
 let currentRoom=0,globe=null,railBusy=false,storyArt=false,storyPhoto=false;
+// Where the visitor stood before teleporting to the interactive museum, to go back to.
+let wing=null,wingReturn=null;
 let imagery=createImagery(),listening=false,voiceMissing=false,reflectiveMaterials=0;
 // Headset image quality. Sharp renders above the browser's default resolution
 // with light foveation; if the headset cannot hold its frame rate it falls
@@ -171,7 +176,7 @@ function collectionState(wi){return {page:pages[wi],pageCount:Math.ceil(records[
 function refreshExhibits(wi){journey.refresh(wi,selected(wi),collectionState(wi));updateUI();}
 function showGuide(){
   if(!renderer.xr.isPresenting){$('#guide').showModal();return;}
-  activeStory={id:'museum-guide',title:'Follow the thread of time.',date:'YOUR JOURNEY',detail:'Begin beside the cosmic expansion. Follow the single sequence of central plinths, from the earliest moments toward the present. Aim a controller at a plinth and press its trigger to read. Aim at the floor to teleport. Doors open when you approach them.',evidence:'Push the right thumbstick to walk. The left thumbstick turns the view in 30-degree steps, or smoothly if you choose that in the Guide. Hold Y on the left controller to rise and X to descend; teleporting to the floor brings you back down. The opening is an artistic visualization of expansion, and exhibit spacing is chronological rather than proportional. All 495 entries are included, in chapters of up to 12. Use NEXT CHAPTER at the desks at either end of a hall to continue in chronological order. The chapter signs show your progress. Doors lead directly to the next hall.',facts:[['Comfort','Use the Guide on screen to select a still cosmic display.']]};storyPage=0;drawStory();
+  activeStory={id:'museum-guide',title:'Follow the thread of time.',date:'YOUR JOURNEY',detail:'Begin beside the cosmic expansion. Follow the single sequence of central plinths, from the earliest moments toward the present. Aim a controller at a plinth and press its trigger to read. Aim at the floor to teleport. Doors open when you approach them.',evidence:'Push the right thumbstick to walk. The left thumbstick turns the view in 30-degree steps, or smoothly if you choose that in the Guide. Hold Y on the left controller to rise and X to descend; teleporting to the floor brings you back down. The opening is an artistic visualization of expansion, and exhibit spacing is chronological rather than proportional. All 495 entries are included, in chapters of up to 12. Use NEXT CHAPTER at the desks at either end of a hall to continue in chronological order. The chapter signs show your progress. Doors lead directly to the next hall. Press B and choose Interactive museum to teleport to Galileo\'s telescope and the Webb telescope, and the same row to come back.',facts:[['Comfort','Use the Guide on screen to select a still cosmic display.']]};storyPage=0;drawStory();
 }
 function placeVisitor(x,z,yaw=0){
   rig.position.y=0;rig.rotation.y=yaw;camera.rotation.set(0,0,0);rig.updateMatrixWorld(true);getCamera().getWorldPosition(head);
@@ -183,13 +188,32 @@ function faceExhibit(wing,index){
   placeVisitor(STAND.x,stationZ(wing,index)+STAND.z,Math.atan2(STAND.x,STAND.z));
 }
 function resetOpeningChapter(){if(pages[0]!==0){pages[0]=0;refreshExhibits(0);}}
-function beginJourney(){resetOpeningChapter();startTour();focusedIndex=-1;placeVisitor(2.6,2,0);currentWing=currentRoom=lastWing=0;updateUI();}
-function goOrigin(){closeStory();resetOpeningChapter();startTour();focusedIndex=-1;placeVisitor(0,4,Math.PI);currentWing=currentRoom=lastWing=0;journey.origin.restart();updateUI();}
+function beginJourney(){resetOpeningChapter();startTour();focusedIndex=-1;wingReturn=null;wing?.closePanel();placeVisitor(2.6,2,0);currentWing=currentRoom=lastWing=0;updateUI();}
+function goOrigin(){closeStory();wing?.closePanel();wingReturn=null;resetOpeningChapter();startTour();focusedIndex=-1;placeVisitor(0,4,Math.PI);currentWing=currentRoom=lastWing=0;journey.origin.restart();updateUI();}
+/** Teleport to the interactive museum, remembering where to come back to. */
+function goInteractive(){
+  if(!wing)return;
+  closeStory();closeMenu();wing.closePanel();startTour();
+  if(currentRoom!==INTERACTIVE){getCamera().getWorldPosition(head);wingReturn={x:head.x,z:head.z,yaw:rig.rotation.y,room:currentRoom};}
+  wing.prepare();
+  placeVisitor(wing.arrival.x,wing.arrival.z,wing.arrival.yaw);
+  currentRoom=lastWing=INTERACTIVE;focusedIndex=-1;updateUI();
+}
+/** Back to where the visitor left the halls, or to the beginning if they arrived some other way. */
+function returnFromWing(){
+  closeMenu();wing?.closePanel();
+  const back=wingReturn;wingReturn=null;
+  if(!back){goOrigin();return;}
+  placeVisitor(back.x,back.z,back.yaw);
+  currentRoom=lastWing=back.room;currentWing=Math.min(back.room,2);updateUI();
+}
 function continueHall(){
+  if(currentRoom===INTERACTIVE){returnFromWing();return;}
   if(currentRoom===FINALE){goOrigin();return;}
   const d=journey.getLayout().doorways[currentRoom];closeStory();journey.openDoor(currentRoom);placeVisitor(2.35,d.z+3,0);
 }
 function nextMoment(delta=1){
+  if(currentRoom===INTERACTIVE)return;
   startTour();closeStory();
   // In the globe room a moment is a position on the rail, not a plinth.
   if(currentRoom===GLOBE_ROOM){globe.step(delta);updateUI();return;}
@@ -211,19 +235,36 @@ function changePage(wi,delta){
   pages[wi]=next;refreshExhibits(wi);enterWing(wi);
 }
 function getCamera(){return camera;}
-function validPosition(x,z,fromZ,headY){return journey.validPosition(x,z,fromZ,headY);}
+function validPosition(x,z,fromZ=z,headY){
+  // The halls and the interactive museum are never one walk apart: each keeps its own floor.
+  const there=!!wing?.contains(z);
+  if(there!==!!wing?.contains(fromZ))return false;
+  return there?wing.validPosition(x,z):journey.validPosition(x,z,fromZ,headY);
+}
 function teleport(x,z){
-  getCamera().getWorldPosition(head);if(!journey.validPosition(x,z,head.z))return;
+  getCamera().getWorldPosition(head);if(!validPosition(x,z,head.z))return;
   rig.position.x+=x-head.x;rig.position.z+=z-head.z;rig.position.y=0;
 }
 function enterWing(wi){
-  closeStory();startTour();focusedIndex=-1;journey.resetDoorsThrough(wi);
+  closeStory();wing?.closePanel();wingReturn=null;startTour();focusedIndex=-1;journey.resetDoorsThrough(wi);
   if(wi===GLOBE_ROOM)placeVisitor(0,-166.8,0);else placeVisitor(2.6,2-wi*HALL_STEP,0);
   currentWing=wi;currentRoom=lastWing=wi;updateUI();
 }
 function startTour(){started=true;document.body.classList.add('touring');$('#tour-ui').hidden=false;}
 function updateUI(){
   if(!records[currentWing])return;
+  const inWing=currentRoom===INTERACTIVE;
+  $('#interactive').setAttribute('aria-pressed',String(inWing));
+  if(inWing){
+    $('#wing-number').textContent='THE INTERACTIVE MUSEUM';$('#wing-title').textContent='Try it yourself';
+    $('#exhibit-count').textContent='Galileo’s telescope · the Webb telescope, full size';
+    $('#chapter-status').textContent='Point at an exhibit, or press it, to begin';
+    $('.chapter-controls').hidden=true;$('#previous').hidden=true;$('#next').hidden=true;
+    $('#next-hall').textContent=wingReturn?'Return to the museum ↩':'Go to the beginning ↩';
+    document.body.classList.remove('globe-room');$('#globe-ui').hidden=true;
+    document.querySelectorAll('[data-wing]').forEach(b=>b.setAttribute('aria-pressed','false'));
+    return;
+  }
   const wing=WINGS[currentWing],finale=currentRoom===FINALE,inGlobe=currentRoom===GLOBE_ROOM;
   const collection=collectionState(currentWing);
   $('#wing-number').textContent=finale?'THE FINALE':'GALLERY '+wing.roman;
@@ -318,7 +359,7 @@ function updateGlobeUI(){
   }
 }
 function showEvent(e){
-  if(!e)return;visited.add(e.id);activeStory=e;storyPage=0;
+  if(!e)return;wing?.closePanel();visited.add(e.id);activeStory=e;storyPage=0;
   if(renderer.xr.isPresenting){drawStory();return;}
   $('#story-title').textContent=e.title;$('#story-date').textContent=dateLine(e);$('#story-art').src=assetURL(e);$('#story-art').alt='Schematic illustration: '+e.title;$('#story-credit').replaceChildren();
   imagery.photo(e).then(found=>{if(!found||activeStory!==e)return;$('#story-art').src=found.url;$('#story-art').alt='Photograph: '+e.title;showCredit($('#story-credit'),found.credit);});
@@ -404,7 +445,9 @@ function drawStory(){
 }
 /** The settings, as the headset shows them: a row for each, with its value. */
 function menuRows(){
+  const away=currentRoom===INTERACTIVE;
   return [
+    {label:'Interactive museum',value:away?'Return →':'Teleport →',tap:()=>{closeMenu();if(away)returnFromWing();else goInteractive();}},
     {label:'Walking speed',value:pace().label,
       tap:()=>setComfort({speed:SPEEDS[(SPEEDS.findIndex(s=>s.id===comfort.speed)+1)%SPEEDS.length].id})},
     {label:'Turning',value:comfort.smoothTurn?'Smooth':'30° steps',tap:()=>setComfort({smoothTurn:!comfort.smoothTurn})},
@@ -416,7 +459,7 @@ function menuRows(){
 }
 // The panel's canvas and the board that carries it, so the planes that pick a
 // row can be placed from the same numbers the row is drawn with.
-const MENU={width:1.4,height:1.16,canvas:{w:1120,h:928,rowTop:196,rowStep:124,rowHeight:108,noteY:846}};
+const MENU={width:1.4,height:1.315,canvas:{w:1120,h:1052,rowTop:196,rowStep:124,rowHeight:108,noteY:970}};
 MENU.perPixel=MENU.height/MENU.canvas.h;
 MENU.rowAt=i=>(MENU.canvas.h/2-(MENU.canvas.rowTop+MENU.canvas.rowHeight/2+i*MENU.canvas.rowStep))*MENU.perPixel;
 MENU.noteAt=()=>(MENU.canvas.h/2-MENU.canvas.noteY)*MENU.perPixel;
@@ -465,7 +508,7 @@ function drawMenu(){
 }
 function toggleMenu(){
   if(menuGroup){closeMenu();return;}
-  closeStory();drawMenu();
+  closeStory();wing?.closePanel();drawMenu();
 }
 function aimController(c){
   c.updateWorldMatrix(true,false);rotation.setFromRotationMatrix(c.matrixWorld);
@@ -474,7 +517,7 @@ function aimController(c){
   return hitFromRay();
 }
 function hitFromRay(){
-  const list=menuGroup?menuTargets:storyGroup?storyTargets:pickables;
+  const list=menuGroup?menuTargets:storyGroup?storyTargets:wing?.panel?wing.panelTargets:pickables;
   return raycaster.intersectObjects(list,false).find(h=>{if(h.distance>=16)return false;for(let p=h.object;p;p=p.parent)if(!p.visible)return false;return true;});
 }
 function activate(hit){
@@ -519,13 +562,13 @@ function move(dx,dz,dt){
   const cam=getCamera();cam.getWorldDirection(direction);direction.y=0;direction.normalize();const right=new THREE.Vector3(-direction.z,0,direction.x);
   temp.copy(direction).multiplyScalar(-dz).addScaledVector(right,dx);if(temp.length()>1)temp.normalize();temp.multiplyScalar(dt*pace().walk);
   cam.getWorldPosition(head);
-  if(journey.validPosition(head.x+temp.x,head.z,head.z,head.y))rig.position.x+=temp.x;
-  if(journey.validPosition(head.x,head.z+temp.z,head.z,head.y))rig.position.z+=temp.z;
+  if(validPosition(head.x+temp.x,head.z,head.z,head.y))rig.position.x+=temp.x;
+  if(validPosition(head.x,head.z+temp.z,head.z,head.y))rig.position.z+=temp.z;
 }
 /** Rise (+1) or descend (-1): never below the floor, and always half a metre under the vault. */
 function rise(amount,dt){
   getCamera().getWorldPosition(head);
-  const eye=head.y-rig.position.y,vault=7+5.7*Math.sqrt(Math.max(0,1-(head.x/9)**2));
+  const eye=head.y-rig.position.y,vault=wing?.contains(head.z)?wing.ceiling:7+5.7*Math.sqrt(Math.max(0,1-(head.x/9)**2));
   rig.position.y=THREE.MathUtils.clamp(rig.position.y+amount*dt*pace().rise,0,Math.max(0,vault-.5-eye));
 }
 /** Fall back to the default headset resolution if frames are being dropped for several seconds. */
@@ -555,14 +598,14 @@ function animate(){
           turn=x;
           // Left controller: Y rises, X descends (xr-standard buttons 5 and 4).
           const buttons=source.gamepad.buttons,lift=(buttons[5]?.pressed?1:0)-(buttons[4]?.pressed?1:0);
-          if(lift&&!storyGroup&&!menuGroup)rise(lift,dt);
+          if(lift&&!storyGroup&&!menuGroup&&!wing?.panel)rise(lift,dt);
         }
         if(source.handedness==='right'){
           // B on the right controller opens and closes the settings panel.
           const pressed=!!source.gamepad.buttons[5]?.pressed;
           if(pressed&&!menuLatched)toggleMenu();
           menuLatched=pressed;
-          if(!storyGroup&&!menuGroup)move(Math.abs(x)>.18?x:0,Math.abs(y)>.18?y:0,dt);
+          if(!storyGroup&&!menuGroup&&!wing?.panel)move(Math.abs(x)>.18?x:0,Math.abs(y)>.18?y:0,dt);
         }
       }
       if(comfort.smoothTurn){
@@ -593,7 +636,8 @@ function animate(){
     }
   }
   const view=getCamera();view.getWorldPosition(head);view.getWorldQuaternion(viewPose.quaternion);viewPose.position.copy(head);
-  const room=roomAt(head.z);currentRoom=room;currentWing=Math.min(room,2);
+  // In the interactive museum the hall bar keeps the hall the visitor came from.
+  const room=roomAt(head.z);currentRoom=room;if(room!==INTERACTIVE)currentWing=Math.min(room,2);
   journey.update(dt,elapsed,head,comfort.gentle,viewPose,comfort.stillSculpture);
   if(room!==lastWing){lastWing=room;focusedIndex=-1;updateUI();}
   else if(room===GLOBE_ROOM&&(frameCounter&3)===0)updateGlobeUI();
@@ -612,7 +656,7 @@ async function enterVR(){
     renderer.xr.setFramebufferScaleFactor(xrQuality.scale);renderer.xr.setFoveation(xrQuality.foveation);
     Object.assign(xrQuality,{slowFrames:0,frames:0,windowStart:0});
     await renderer.xr.setSession(session);
-    session.addEventListener('end',()=>{closeStory();closeMenu();camera.position.set(0,1.65,0);camera.rotation.set(0,0,0);turnLatched=false;menuLatched=false;});
+    session.addEventListener('end',()=>{closeStory();closeMenu();wing?.closePanel();camera.position.set(0,1.65,0);camera.rotation.set(0,0,0);turnLatched=false;menuLatched=false;});
   }catch(err){if(session)await session.end().catch(()=>{});camera.position.set(0,1.65,0);$('#xr-status').textContent=err.message;$('#guide-status').textContent=err.message;}
 }
 function populateLibrary(){
@@ -629,6 +673,7 @@ function wireUI(){
   $('#explore').onclick=beginJourney;$('#enter-vr').onclick=enterVR;$('#vr-from-guide').onclick=enterVR;
   $('#help').onclick=showGuide;
   $('#origin').onclick=goOrigin;$('#next-hall').onclick=continueHall;
+  $('#interactive').onclick=()=>currentRoom===INTERACTIVE?returnFromWing():goInteractive();
   $('#settings-open').onclick=()=>$('#settings').showModal();
   $('#gentle').onchange=e=>setComfort({gentle:e.target.checked});
   $('#still-sculpture').onchange=e=>setComfort({stillSculpture:e.target.checked});
@@ -714,15 +759,23 @@ async function init(){
       begin:beginJourney,origin:goOrigin,nextCollection:changePage,help:showGuide,
       turnStyle:()=>setSmoothTurn(!comfort.smoothTurn),
       exit:()=>{if(renderer.xr.isPresenting)renderer.xr.getSession().end();else location.href='../';},
-      humanEvents:records[GLOBE_ROOM],read:showEvent,globeChange:()=>updateGlobeUI(),imagery
+      humanEvents:records[GLOBE_ROOM],read:showEvent,globeChange:()=>updateGlobeUI(),imagery,
+      interactive:()=>goInteractive()
+    });
+    wing=createInteractiveWing(THREE,scene,{
+      raycaster,place:(group,distance)=>panelAt(group,distance),
+      opened:()=>{closeStory();closeMenu();},returnToMuseum:()=>returnFromWing(),
+      // The Webb's parts arrive with its model, after the rest of the museum.
+      added:spots=>pickables.push(...spots)
     });
     // Only metal takes the reflections: that is where they show, and it keeps the
     // per-pixel cost off the walls, floor and vault that fill most of the view.
     const reflections=galleryEnvironment();let reflective=0;
     scene.traverse(o=>{for(const m of [o.material].flat()){if(m?.isMeshStandardMaterial&&m.metalness>=.3&&!m.envMap){m.envMap=reflections;m.envMapIntensity=.85;m.needsUpdate=true;reflective++;}}});
     reflectiveMaterials=reflective;
+    wing.setEnvironment(reflections);
     globe=journey.humanity;
-    pickables.push(...journey.pickables);panels.push(...journey.panels);for(let wi=0;wi<3;wi++)refreshExhibits(wi);
+    pickables.push(...journey.pickables,...wing.pickables);panels.push(...journey.panels);for(let wi=0;wi<3;wi++)refreshExhibits(wi);
     teleportMarker=new THREE.Mesh(new THREE.RingGeometry(.23,.28,36),new THREE.MeshBasicMaterial({color:'#adf2c2',side:THREE.DoubleSide}));teleportMarker.rotation.x=-Math.PI/2;teleportMarker.visible=false;scene.add(teleportMarker);
     addControllers();wireUI();buildGlobeUI();ready=true;
     $('#explore').disabled=false;$('#explore').textContent='Begin your journey   →';
@@ -731,6 +784,9 @@ async function init(){
     $('#xr-status').textContent=supports?'Your headset is ready. Step inside.':'Explore here, or open this museum over HTTPS in your Quest browser.';
     $('#guide-status').textContent=supports?'Your headset is ready.':'Immersive VR requires a headset browser and HTTPS.';
     renderer.setAnimationLoop(animate);
+    // The interactive museum's model and evenings come once the halls are up,
+    // so they are ready by the time a visitor teleports there.
+    setTimeout(()=>wing.prepare(),4000);
     // Meta treats launching the installed immersive PWA as the activation gesture.
     if(supports && window.getDigitalGoodsService!==undefined && new URLSearchParams(location.search).has('installed'))enterVR();
     if('serviceWorker' in navigator && window.isSecureContext)navigator.serviceWorker.register('../sw.js').catch(()=>{});
@@ -755,7 +811,8 @@ async function init(){
           const cx=c.getContext('2d');cx.imageSmoothingQuality='high';cx.drawImage(image,0,0,c.width,c.height);
           return {png,inset:{x:x/1800,y:y/1500,width:w/1800,height:h/1500,jpg:c.toDataURL('image/jpeg',.92)}};
         });
-      },globe,getState:()=>({ready,started,currentWing,currentRoom,pages:[...pages],collections:records.map((_,wi)=>collectionState(wi)),eventCount:events.length,visibleExhibits:panels.flat().filter(p=>p.g.visible).length,position:rig.position.toArray(),yaw:rig.rotation.y,visited:[...visited],story:activeStory?.id,storyPage,storyInVR:!!storyGroup,storyArt,storyPhoto,storyListening:listening,storyVoiceMissing:voiceMissing,storyControls:storyTargets.filter(m=>m.userData.label).map(m=>({label:m.userData.label,target:m.getWorldPosition(new THREE.Vector3()).toArray()})),settings:{...comfort,walk:pace().walk,rise:pace().rise,turn:pace().turn,sharp:xrQuality.sharp,speeds:SPEEDS.map(s=>s.id)},menuInVR:!!menuGroup,menuControls:menuTargets.filter(m=>m.userData.label).map(m=>({label:m.userData.label,value:m.userData.value||null,target:m.getWorldPosition(new THREE.Vector3()).toArray()})),photos:imagery.getState(),quality:{sharp:xrQuality.sharp,reduced:xrQuality.reduced,scale:xrQuality.scale,foveation:xrQuality.foveation,pixelRatio:renderer.getPixelRatio(),anisotropy:THREE.Texture.DEFAULT_ANISOTROPY,environment:reflectiveMaterials>0,reflectiveMaterials},frames:frameCounter,focusedIndex,...journey.getState(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,xr:renderer.xr.isPresenting}),enterWing,goOrigin,nextMoment,openDoor:i=>journey.openDoor(i),showEvent:id=>showEvent(events.find(e=>e.id===id)),changePage,validPosition,roomAt,rise:(amount,seconds)=>rise(amount,seconds),menu:open=>{if(open&&!menuGroup)drawMenu();else if(!open)closeMenu();},setComfort,viewFrom:(x,z,yaw=0,pitch=0)=>{startTour();placeVisitor(x,z,yaw);camera.rotation.x=pitch;}}
+      },globe,getState:()=>({ready,started,currentWing,currentRoom,pages:[...pages],collections:records.map((_,wi)=>collectionState(wi)),eventCount:events.length,visibleExhibits:panels.flat().filter(p=>p.g.visible).length,position:rig.position.toArray(),yaw:rig.rotation.y,visited:[...visited],story:activeStory?.id,storyPage,storyInVR:!!storyGroup,storyArt,storyPhoto,storyListening:listening,storyVoiceMissing:voiceMissing,storyControls:storyTargets.filter(m=>m.userData.label).map(m=>({label:m.userData.label,target:m.getWorldPosition(new THREE.Vector3()).toArray()})),settings:{...comfort,walk:pace().walk,rise:pace().rise,turn:pace().turn,sharp:xrQuality.sharp,speeds:SPEEDS.map(s=>s.id)},menuInVR:!!menuGroup,menuControls:menuTargets.filter(m=>m.userData.label).map(m=>({label:m.userData.label,value:m.userData.value||null,target:m.getWorldPosition(new THREE.Vector3()).toArray()})),photos:imagery.getState(),quality:{sharp:xrQuality.sharp,reduced:xrQuality.reduced,scale:xrQuality.scale,foveation:xrQuality.foveation,pixelRatio:renderer.getPixelRatio(),anisotropy:THREE.Texture.DEFAULT_ANISOTROPY,environment:reflectiveMaterials>0,reflectiveMaterials},frames:frameCounter,focusedIndex,interactive:{...wing.getState(),inside:currentRoom===INTERACTIVE,canReturn:!!wingReturn},...journey.getState(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,xr:renderer.xr.isPresenting}),enterWing,goOrigin,nextMoment,openDoor:i=>journey.openDoor(i),showEvent:id=>showEvent(events.find(e=>e.id===id)),changePage,validPosition,roomAt,rise:(amount,seconds)=>rise(amount,seconds),menu:open=>{if(open&&!menuGroup)drawMenu();else if(!open)closeMenu();},setComfort,viewFrom:(x,z,yaw=0,pitch=0)=>{startTour();placeVisitor(x,z,yaw);camera.rotation.x=pitch;},
+      goInteractive,returnFromWing,wing}
 
   }catch(err){console.error(err);$('#error').hidden=false;$('#error').textContent='The museum could not start: '+err.message+' You can still explore the original timeline using the link above.';$('#explore').textContent='Museum unavailable';}
 }

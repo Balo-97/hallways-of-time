@@ -374,7 +374,11 @@ export async function nativePlates({music = null, mark = null} = {}) {
     'note-chapter': note('Not in this build yet',
       'That chapter is still to be carried across into the headset. This hall is coming across an era at a time; walk on through the doors to the next hall.'),
     'note-collection': note('Not in this build yet',
-      'This hall’s exhibits, their pictures and their chapters are still to be carried across into the headset.')
+      'This hall’s exhibits, their pictures and their chapters are still to be carried across into the headset.'),
+    // EXIT VR stands at the foot of every chapter desk, where a pointer aimed
+    // at the floor can find it: one press asks, and only a second one leaves.
+    'note-leave': note('Leave the museum?',
+      'Press EXIT VR again to close Hallways of Time and go back to your Home. Anything else, and you stay.')
   };
   if (music?.pieces?.length) sheets['credits-music'] = credits(music.pieces);
   sheets['welcome'] = welcome(markImage);
