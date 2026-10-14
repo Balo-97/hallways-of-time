@@ -27,6 +27,8 @@ import {createPeriodicTable} from './exhibits/periodic-table.js';
 import {createDoubleHelix} from './exhibits/double-helix.js';
 import {createContinentalDrift} from './exhibits/continental-drift.js';
 import {createMendel} from './exhibits/mendel.js';
+import {createTuringMachine} from './exhibits/turing-machine.js';
+import {createSuSongClock} from './exhibits/su-song-clock.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
@@ -45,7 +47,7 @@ const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
 // through everything else in the rotunda, to look as close as they like.
 const ROPE = {along: 15.2, across: 8.9};
 // Where things stand round the wall, in degrees from the way in.
-const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108, elements: -150, helix: 152, drift: 82, mendel: 129};
+const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108, elements: -150, helix: 152, drift: 82, mendel: 129, turing: -125, susong: -74};
 // Where Jupiter is painted in Galileo's window, from the middle of its sill: the telescope points there.
 const JUPITER_IN_WINDOW = {x: .25, y: 3.0};
 const MOON_ORBITS = [5.9, 9.4, 15, 26.4];   // mean distances, Jupiter radii
@@ -270,7 +272,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const FRIEZE = {y: DRUM - 1.15, height: 1};
   {
     // Each side names who stands beneath it, in the order a visitor facing it reads them.
-    const quarters = [[180, 'MENDELEEV · 1869   ✦   THE INTERACTIVE MUSEUM   ✦   THE DOUBLE HELIX · 1953'], [-90, 'GALILEO · PADUA 1610   ✦   RØMER · PARIS 1676'],
+    const quarters = [[180, 'MENDELEEV · 1869   ✦   THE INTERACTIVE MUSEUM   ✦   THE DOUBLE HELIX · 1953'], [-90, 'GALILEO · 1610   ✦   SU SONG · 1092   ✦   RØMER · 1676   ✦   TURING · 1936'],
       [90, 'MENDEL · 1866   ✦   GUTENBERG · 1450   ✦   WEGENER · 1912   ✦   WEBB · 2021'], [0, 'LOOK WHERE THEY LOOKED   ✦   DO WHAT THEY DID']];
     // A quarter of the frieze is 34.5 m long and a metre high: 2,048 by 60 pixels keeps the letters square.
     for (const [angle, words] of quarters) {
@@ -531,7 +533,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   };
   const exhibits = [createSpeedOfLight(kit, {angle: PLACES.romer}), createPrintingPress(kit, {angle: PLACES.press}),
     createPeriodicTable(kit, {angle: PLACES.elements}), createDoubleHelix(kit, {angle: PLACES.helix}),
-    createContinentalDrift(kit, {angle: PLACES.drift}), createMendel(kit, {angle: PLACES.mendel})];
+    createContinentalDrift(kit, {angle: PLACES.drift}), createMendel(kit, {angle: PLACES.mendel}),
+    createTuringMachine(kit, {angle: PLACES.turing}), createSuSongClock(kit, {angle: PLACES.susong})];
   const exhibit = Object.fromEntries(exhibits.map(e => [e.id, e]));
 
   // The medallions, one draw for each of their three parts.
@@ -807,6 +810,9 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     }
     const actions = spec.actions();
     actions.forEach(([text, fn, tone], i) => button(text, fn, i, actions.length, tone));
+    // Drawn over everything, so an exhibit the visitor stands close to never cuts through it.
+    // Marked transparent so it is drawn after the see-through things too, such as water.
+    panel.traverse(o => { if (o.isMesh) { o.material.depthTest = false; o.material.transparent = true; o.renderOrder = 10 + (o === sheet ? 0 : 1); } });
   }
   Object.assign(panelSpecs, {
     telescope: {paint: paintTelescope, actions: () => [['← EARLIER', () => stepNight(-1)],
