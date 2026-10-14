@@ -282,7 +282,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   }
   // The halls' floor medallions — two gilt rings and eight petals of stone —
   // where a visitor arrives, and under the stage of every bay, all on one ring.
-  const medallions = [[ARRIVAL.x, ARRIVAL.z], ...BAYS.map(b => [Math.sin(b.angle * deg) * (R - STAGE), Math.cos(b.angle * deg) * (R - STAGE)])];
+  // Galileo's bay has its rug instead.
+  const medallions = [[ARRIVAL.x, ARRIVAL.z], ...BAYS.filter(b => b.id !== 'galileo').map(b => [Math.sin(b.angle * deg) * (R - STAGE), Math.cos(b.angle * deg) * (R - STAGE)])];
   // The wall: a drum of plaster with a marble skirting, a dado rail and a cornice.
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, DRUM, 192, 1, true), M.plaster);
   drum.material = M.plaster.clone(); drum.material.side = THREE.BackSide;
@@ -415,33 +416,90 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const arch = new THREE.Mesh(new THREE.TorusGeometry(w + .08, .08, 6, 32, Math.PI), M.gold);
     arch.position.set(0, window_.bottom + straight, .02); galileoWall.add(arch);
   }
-  // The telescope: a tapering tube about a metre long, leather over wood, on a stand.
-  const scope = new THREE.Group(); scope.name = 'Galileo’s telescope';
+  // Stars that twinkle in the window: the ones painted on the glass keep still,
+  // these brighten and fade one by one. Jupiter, a planet, shines steadily.
+  const twinkle = {stars: null, phase: [], speed: []};
   {
-    const pivot = new THREE.Vector3(0, 1.75, GALILEO_STAGE);
+    const w = window_.width / 2, straight = window_.height - w, r = seeded(1610), points = [];
+    while (points.length < 70 * 3) {
+      const x = (r() * 2 - 1) * (w - .12), y = .5 + r() * (window_.height - .7);
+      const inside = y < straight || Math.hypot(x, y - straight) < w - .12;
+      const nearJupiter = Math.hypot(x - JUPITER_IN_WINDOW.x, y - JUPITER_IN_WINDOW.y) < .35;
+      // Above the rooftops and the bell tower painted along the foot of the window.
+      if (inside && !nearJupiter && y > 2.1) points.push(x, window_.bottom + y, .03);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Array(points.length).fill(1), 3));
+    const dot = document.createElement('canvas'); dot.width = dot.height = 32;
+    { const ctx = dot.getContext('2d'), g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.3, 'rgba(255,246,220,.6)'); g.addColorStop(1, 'rgba(255,246,220,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 32, 32); }
+    twinkle.stars = new THREE.Points(geometry, new THREE.PointsMaterial({size: .07, map: texture(dot), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending}));
+    galileoWall.add(twinkle.stars); moving.push(twinkle.stars);
+    for (let i = 0; i < points.length / 3; i++) { twinkle.phase.push(r() * Math.PI * 2); twinkle.speed.push(1.5 + r() * 3.5); }
+  }
+
+  // ── Galileo's telescope, its stand, and his desk ─────────────────────
+  /**
+   * Leather with gilt tooling, as on the telescope of Galileo's that survives
+   * in Florence covered in leather: u runs round the tube and v along it.
+   */
+  function tooledLeather() {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 1024; const ctx = c.getContext('2d');
+    ctx.fillStyle = '#5c2c1c'; ctx.fillRect(0, 0, 256, 1024);
+    const r = seeded(1609);
+    for (let i = 0; i < 2600; i++) { ctx.fillStyle = r() < .5 ? `rgba(30,12,6,${.05 + r() * .08})` : `rgba(130,74,46,${.05 + r() * .07})`; ctx.fillRect(r() * 256, r() * 1024, 1 + r() * 3, 1 + r() * 2); }
+    ctx.fillStyle = '#d8b25e';
+    for (const v of [70, 330, 600, 870]) {
+      ctx.fillRect(0, v - 13, 256, 3); ctx.fillRect(0, v + 10, 256, 3);
+      for (let x = 8; x < 256; x += 32) { ctx.beginPath(); ctx.arc(x, v, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(x + 9, v - 1.2, 13, 2.4); }
+    }
+    ctx.fillStyle = 'rgba(216,178,94,.7)';
+    for (let v = 120; v < 980; v += 52) for (let x = (Math.round(v / 52) % 2) * 32; x < 256; x += 64) {
+      if ([70, 330, 600, 870].some(b => Math.abs(v - b) < 30)) continue;
+      ctx.beginPath(); ctx.moveTo(x, v - 7); ctx.lineTo(x + 4.5, v); ctx.lineTo(x, v + 7); ctx.lineTo(x - 4.5, v); ctx.fill();
+    }
+    return texture(c);
+  }
+  /** A turned part: `profile` is [radius, height] pairs from one end to the other, along +y. */
+  const turnedPart = (profile, material, segments = 28) => new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments), material);
+  const galileoMoving = {scope: null, quill: null, cover: null, flame: null, halo: null, nudge: 0, t: 0};
+  // The telescope, built along +y and laid along +z, which lookAt then turns toward Jupiter.
+  const scope = new THREE.Group(); scope.name = 'Galileo’s telescope';
+  const pivot = new THREE.Vector3(0, 1.75, GALILEO_STAGE);
+  {
     scope.position.copy(pivot); galileoWall.add(scope);
     group.updateMatrixWorld(true);
     scope.lookAt(galileoWall.localToWorld(new THREE.Vector3(JUPITER_IN_WINDOW.x, window_.bottom + JUPITER_IN_WINDOW.y, 0)));
-    // Built along +z, which lookAt turns toward the window.
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(.024, .017, .93, 24, 1, true), M.leather);
-    tube.rotation.x = Math.PI / 2; scope.add(tube);
-    for (const z of [-.44, -.2, .1, .4]) { const ring = new THREE.Mesh(new THREE.CylinderGeometry(.0235 - z * .008, .0235 - z * .008, .018, 24), M.gold); ring.rotation.x = Math.PI / 2; ring.position.z = z; scope.add(ring); }
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(.027, .026, .035, 24), M.brass); lens.rotation.x = Math.PI / 2; lens.position.z = .475; scope.add(lens);
-    const eyepiece = new THREE.Mesh(new THREE.CylinderGeometry(.012, .014, .06, 16), M.darkWood); eyepiece.rotation.x = Math.PI / 2; eyepiece.position.z = -.49; scope.add(eyepiece);
+    scope.updateMatrixWorld(true);
+    const tube = new THREE.Group(); tube.rotation.x = Math.PI / 2; scope.add(tube);
+    const leather = new THREE.MeshStandardMaterial({map: tooledLeather(), roughness: .62});
+    tube.add(turnedPart([[.0172, -.43], [.0182, -.3], [.0198, -.1], [.0214, .1], [.023, .3], [.0242, .44]], leather, 32));
+    // The objective's wooden cell with a brass ring at the front, and the turned eyepiece.
+    tube.add(turnedPart([[.0244, .43], [.028, .44], [.029, .47], [.027, .49], [.021, .495]], M.darkWood));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.0275, .0035, 8, 32), M.brass); ring.rotation.x = Math.PI / 2; ring.position.y = .485; tube.add(ring);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(.021, 24), new THREE.MeshStandardMaterial({color: '#9fb6c8', metalness: .6, roughness: .05})); lens.rotation.x = -Math.PI / 2; lens.position.y = .496; tube.add(lens);
+    tube.add(turnedPart([[.008, -.52], [.011, -.51], [.0125, -.49], [.0115, -.47], [.016, -.455], [.0175, -.43]], M.darkWood));
     // A proxy larger than the slim tube, so it is easy to aim at.
     const handle = new THREE.Mesh(new THREE.BoxGeometry(.32, .32, 1.15), invisible); scope.add(handle);
     press(handle, () => openTelescope(), 'Galileo’s telescope');
-    // The stand: three legs, a column and a cradle.
+    galileoMoving.scope = scope; galileoMoving.aim = scope.quaternion.clone(); moving.push(scope);
+    // The stand: three turned legs on brass feet, a turned column, and a brass fork carrying the tube on a pin.
     const stand = new THREE.Group(); stand.position.set(pivot.x, 0, pivot.z); galileoWall.add(stand);
-    box(stand, [.07, pivot.y - .12, .07], [0, (pivot.y - .12) / 2 + .02, 0], M.wood);
-    // Each leg runs from the column, half a metre up, out to the floor.
-    const top = new THREE.Vector3(0, .55, 0), up = new THREE.Vector3(0, 1, 0);
+    const hub = .62, up = new THREE.Vector3(0, 1, 0);
     for (let i = 0; i < 3; i++) {
-      const a = i / 3 * Math.PI * 2 + .3, foot = new THREE.Vector3(Math.cos(a) * .36, 0, Math.sin(a) * .36);
-      const span = top.clone().sub(foot), leg = new THREE.Mesh(new THREE.CylinderGeometry(.016, .022, span.length(), 8), M.wood);
-      leg.position.copy(foot).addScaledVector(span, .5); leg.quaternion.setFromUnitVectors(up, span.normalize()); stand.add(leg);
+      const a = i / 3 * Math.PI * 2 + .3, foot = new THREE.Vector3(Math.cos(a) * .42, .02, Math.sin(a) * .42), top = new THREE.Vector3(Math.cos(a) * .05, hub, Math.sin(a) * .05);
+      const span = top.clone().sub(foot), leg = turnedPart([[.014, 0], [.02, .1], [.016, .5], [.019, .9], [.014, 1]], M.wood, 12);
+      leg.scale.set(1, span.length(), 1); leg.position.copy(foot); leg.quaternion.setFromUnitVectors(up, span.normalize()); stand.add(leg);
+      const shoe = new THREE.Mesh(new THREE.SphereGeometry(.024, 10, 8), M.brass); shoe.position.copy(foot); stand.add(shoe);
     }
-    box(stand, [.12, .07, .16], [0, pivot.y - .08, 0], M.brass);
+    const column = turnedPart([[.05, hub - .04], [.06, hub], [.035, hub + .06], [.028, hub + .4], [.034, hub + .55], [.026, hub + .7], [.03, pivot.y - .14], [.04, pivot.y - .1]], M.wood, 20);
+    stand.add(column);
+    // The fork turns with the tube's bearing; the tube tilts in it on the pin.
+    const towards = galileoWall.worldToLocal(scope.localToWorld(new THREE.Vector3(0, 0, 1))).sub(pivot);
+    const fork = new THREE.Group(); fork.position.y = pivot.y; fork.rotation.y = Math.atan2(towards.x, towards.z); stand.add(fork);
+    for (const side of [-1, 1]) box(fork, [.008, .14, .05], [side * .034, -.05, 0], M.brass);
+    box(fork, [.076, .014, .05], [0, -.12, 0], M.brass);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(.006, .006, .09, 10), M.brass); pin.rotation.z = Math.PI / 2; fork.add(pin);
   }
   /** A plaque on a slate stand at x, z, turned to face tx, tz, that does `action` when pressed. */
   function plaque(x, z, tx, tz, lines, action, label) {
@@ -466,20 +524,140 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['A tube about a metre long, magnifying', .45, .028, '#a99a7c', 'italic #px Georgia, serif'],
       ['about twenty times.', .49, .028, '#a99a7c', 'italic #px Georgia, serif']], () => openTelescope(), 'Galileo plaque');
   }
-  // A desk with the visitor's notebook open on it: every evening they look at is written in.
+  // A writing table with the visitor's notebook open on it: every evening they look at is written in.
   const book = {canvas: null, map: null};
+  const DESK = {inkwell: new THREE.Vector3(.5, .79, -.2)};
   {
     const at = inRoom(galileoWall, -2.1, GALILEO_STAGE - .4), desk = facing(new THREE.Group(), at.x, at.z, 0, 0);
-    box(desk, [1.5, .06, .78], [0, .76, 0], M.wood);
-    for (const [x, z] of [[-.68, -.33], [.68, -.33], [-.68, .33], [.68, .33]]) box(desk, [.06, .73, .06], [x, .365, z], M.darkWood);
+    // The table: a moulded top, an apron with a drawer, and four turned legs.
+    box(desk, [1.56, .045, .82], [0, .775, 0], M.wood); box(desk, [1.5, .03, .76], [0, .745, 0], M.darkWood);
+    box(desk, [1.36, .12, .64], [0, .67, 0], M.wood);
+    box(desk, [.44, .08, .01], [0, .67, .325], M.darkWood);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(.014, 10, 8), M.brass); knob.position.set(0, .67, .335); desk.add(knob);
+    for (const [x, z] of [[-.66, -.3], [.66, -.3], [-.66, .3], [.66, .3]]) {
+      const leg = turnedPart([[.026, 0], [.022, .06], [.03, .12], [.02, .3], [.026, .5], [.024, .6], [.034, .61], [.034, .73]], M.darkWood, 14);
+      leg.position.set(x, 0, z); desk.add(leg);
+    }
     // Read from half a metre, so painted finer than the signs: 2,000 pixels a metre.
     const canvas = document.createElement('canvas'); canvas.width = 1520; canvas.height = 1000; book.canvas = canvas; book.map = texture(canvas);
-    const pages = new THREE.Mesh(new THREE.PlaneGeometry(.76, .5), new THREE.MeshStandardMaterial({map: book.map, roughness: .9}));
-    pages.rotation.x = -Math.PI / 2 + .12; pages.position.set(0, .8, .04); desk.add(pages);
-    box(desk, [.8, .025, .54], [0, .785, .04], M.leather);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(.035, .04, .06, 16), M.ink); well.position.set(.56, .82, -.2); desk.add(well);
-    const quill = new THREE.Mesh(new THREE.ConeGeometry(.012, .32, 6), M.paper); quill.position.set(.56, .93, -.17); quill.rotation.set(.5, 0, -.25); desk.add(quill);
+    const paper = new THREE.MeshStandardMaterial({map: book.map, roughness: .9});
+    const pages = new THREE.Mesh(new THREE.PlaneGeometry(.76, .5), paper);
+    pages.rotation.x = -Math.PI / 2 + .12; pages.position.set(0, .82, .04); desk.add(pages);
+    box(desk, [.8, .025, .54], [0, .805, .04], M.leather);
+    // The paper not yet written on: a strip over a new line, drawn back as the quill writes.
+    const cover = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({color: '#efe4c8', roughness: .9}));
+    cover.geometry.translate(.5, 0, 0); cover.position.z = .0015; cover.visible = false; pages.add(cover);
+    galileoMoving.cover = cover; galileoMoving.pages = pages; moving.push(cover);
+    // The inkwell, and a quill standing in it.
+    const well = turnedPart([[.0, 0], [.042, 0], [.046, .02], [.04, .05], [.022, .06], [.024, .072], [.016, .074]], new THREE.MeshStandardMaterial({color: '#1b2a2e', metalness: .3, roughness: .15}), 20);
+    well.position.copy(DESK.inkwell).setY(.795); desk.add(well);
+    const quill = new THREE.Group();
+    { const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.0018, .003, .3, 6), M.paper); shaft.position.y = .15; quill.add(shaft);
+      const vane = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({color: '#f2ece0', roughness: .8, side: THREE.DoubleSide}));
+      vane.scale.set(.022, .11, .002); vane.position.y = .2; vane.rotation.z = .08; quill.add(vane); }
+    desk.add(quill); galileoMoving.quill = quill; galileoMoving.desk = desk; moving.push(quill);
+    // A candle in a brass stick, its flame flickering, and a stack of books.
+    const stick = turnedPart([[.0, .795], [.06, .795], [.062, .805], [.02, .815], [.012, .86], [.018, .9], [.02, .905]], M.brass, 20);
+    stick.position.set(-.55, 0, -.18); desk.add(stick);
+    const wax = new THREE.Mesh(new THREE.CylinderGeometry(.014, .015, .14, 14), new THREE.MeshStandardMaterial({color: '#efe7d2', roughness: .7})); wax.position.set(-.55, .975, -.18); desk.add(wax);
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({color: '#ffc561'}));
+    flame.geometry.translate(0, .7, 0); flame.scale.set(.008, .022, .008); flame.position.set(-.55, 1.05, -.18); desk.add(flame);
+    const haloCanvas = document.createElement('canvas'); haloCanvas.width = haloCanvas.height = 64;
+    { const ctx = haloCanvas.getContext('2d'), g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,214,140,.9)'); g.addColorStop(.35, 'rgba(255,170,80,.35)'); g.addColorStop(1, 'rgba(255,150,60,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64); }
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({map: texture(haloCanvas), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true}));
+    halo.scale.setScalar(.22); halo.position.set(-.55, 1.07, -.18); desk.add(halo);
+    galileoMoving.flame = flame; galileoMoving.halo = halo; moving.push(flame, halo);
+    const covers = ['#5a2a1c', '#2e3d2a', '#6b4a22'];
+    covers.forEach((color, i) => {
+      const w = .26 - i * .02, d = .19 - i * .012, h = .045 - i * .006, y = .8 + [0, .045, .084][i] + h / 2;
+      box(desk, [w, h, d], [.48, y, .14 + i * .008], new THREE.MeshStandardMaterial({color, roughness: .7}));
+      box(desk, [w - .012, h - .01, d + .002], [.484, y, .14 + i * .008], M.paper);
+    });
     press(pages, () => openTelescope(), 'Notebook');
+    // A chair drawn up behind the table, facing the room, as if he had just stood up to look.
+    const chair = new THREE.Group(); chair.position.set(.15, 0, -.62); chair.rotation.y = .25; desk.add(chair);
+    box(chair, [.46, .04, .44], [0, .46, 0], M.wood);
+    box(chair, [.42, .03, .4], [0, .485, 0], new THREE.MeshStandardMaterial({color: '#6b2a22', roughness: .85}));
+    for (const [x, z] of [[-.2, -.18], [.2, -.18], [-.2, .18], [.2, .18]]) {
+      const leg = turnedPart([[.018, 0], [.022, .08], [.016, .25], [.02, .44]], M.darkWood, 10); leg.position.set(x, 0, z); chair.add(leg);
+    }
+    for (const x of [-.2, .2]) box(chair, [.035, .55, .035], [x, .74, -.2], M.darkWood);
+    box(chair, [.44, .1, .03], [0, .92, -.2], M.wood); box(chair, [.44, .05, .025], [0, .7, -.2], M.wood);
+  }
+  // A rug of the time under the telescope and the table: a red field, a medallion, borders in gold and blue.
+  {
+    const W = 4.2, D = 2.6, c = document.createElement('canvas'); c.width = 1024; c.height = Math.round(1024 * D / W);
+    const ctx = c.getContext('2d'), w = c.width, h = c.height;
+    ctx.fillStyle = '#6e2019'; ctx.fillRect(0, 0, w, h);
+    const band = (inset, width, color) => { ctx.strokeStyle = color; ctx.lineWidth = width; ctx.strokeRect(inset, inset, w - inset * 2, h - inset * 2); };
+    band(10, 14, '#c9a664'); band(34, 30, '#20304a'); band(58, 6, '#c9a664');
+    // Motifs along the blue border.
+    ctx.fillStyle = '#c9a664';
+    for (let x = 60; x < w - 50; x += 46) for (const y of [34, h - 34]) { ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x + 9, y); ctx.lineTo(x, y + 9); ctx.lineTo(x - 9, y); ctx.fill(); }
+    for (let y = 80; y < h - 70; y += 46) for (const x of [34, w - 34]) { ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x + 9, y); ctx.lineTo(x, y + 9); ctx.lineTo(x - 9, y); ctx.fill(); }
+    // The central medallion, and quarter medallions in the corners of the field.
+    const medallion = (x, y, r) => {
+      ctx.fillStyle = '#20304a'; ctx.beginPath(); ctx.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#c9a664'; ctx.lineWidth = 5; ctx.stroke();
+      ctx.fillStyle = '#b8862e'; ctx.beginPath(); ctx.ellipse(x, y, r * .8, r * .5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6e2019'; for (let a = 0; a < 8; a++) { ctx.beginPath(); ctx.arc(x + Math.cos(a * Math.PI / 4) * r * 1.15, y + Math.sin(a * Math.PI / 4) * r * .72, r * .12, 0, Math.PI * 2); ctx.fill(); }
+    };
+    medallion(w / 2, h / 2, 110);
+    for (const [x, y] of [[70, 70], [w - 70, 70], [70, h - 70], [w - 70, h - 70]]) medallion(x, y, 50);
+    // Wear and the weave.
+    const r = seeded(1592);
+    for (let i = 0; i < 5000; i++) { ctx.fillStyle = `rgba(${r() < .5 ? '20,8,6' : '230,190,140'},${r() * .06})`; ctx.fillRect(r() * w, r() * h, 2, 1); }
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({map: texture(c), roughness: .95}));
+    rug.rotation.x = -Math.PI / 2;
+    const at = inRoom(galileoWall, -.95, GALILEO_STAGE - .15); rug.position.set(at.x, .028, at.z);
+    rug.rotation.z = bayOf('galileo').angle * deg + Math.PI;   // laid square to the wall
+    group.add(rug);
+  }
+  quillPose(0);
+  /** Where a line of the notebook lies on the page, in the page's own metres. */
+  const notebookRow = slot => { const column = slot < 8 ? 0 : 1, row = slot % 8; return {x: 30 + column * 380, y: 120 + row * 46}; };
+  const pageAt = (px, py) => new THREE.Vector3((px / 760 - .5) * .76, (.5 - py / 500) * .5, 0);
+  /** The quill's pose: resting in the inkwell, or writing at a point on the page. */
+  function quillPose(t) {
+    const q = galileoMoving.quill, w = galileoMoving.writing, rest = DESK.inkwell.clone().setY(.83);
+    if (!w) { q.position.copy(rest); q.rotation.set(-.35, 0, .28); return; }
+    const {x, y} = notebookRow(w.slot), start = galileoMoving.pages.localToWorld(pageAt(x + 6, y + 4)), end = galileoMoving.pages.localToWorld(pageAt(x + 335, y + 4));
+    galileoMoving.desk.worldToLocal(start); galileoMoving.desk.worldToLocal(end);
+    const ease = s => s < .5 ? 2 * s * s : 1 - (-2 * s + 2) ** 2 / 2;
+    // Out of the inkwell to the line (0 to .25), along it (.25 to .8), back (.8 to 1).
+    let p;
+    if (t < .25) { const s = ease(t / .25); p = rest.clone().lerp(start, s); p.y += Math.sin(s * Math.PI) * .07; }
+    else if (t < .8) { const s = (t - .25) / .55; p = start.clone().lerp(end, s); p.z += Math.sin(s * 40) * .004; p.y += Math.abs(Math.sin(s * 22)) * .004; }
+    else { const s = ease((t - .8) / .2); p = end.clone().lerp(rest, s); p.y += Math.sin(s * Math.PI) * .07; }
+    q.position.copy(p); q.rotation.set(-.55, .2, .35 + Math.sin(t * 30) * .03 * (t > .25 && t < .8));
+    // The strip over the new line draws back behind the nib.
+    const reveal = Math.max(0, Math.min(1, (t - .22) / .58)), from = pageAt(x - 4, y - 2), to = pageAt(x + 345, y - 2);
+    const cover = galileoMoving.cover;
+    cover.visible = reveal < 1; cover.position.set(from.x + (to.x - from.x) * reveal, from.y, .0015);
+    cover.scale.set(Math.max(.001, (to.x - from.x) * (1 - reveal)), .034, 1);   // a line is some 30 of the page's 500 pixels tall
+  }
+  /** Each frame: the stars, the candle, the quill, and the telescope settling after a turn of the eye. */
+  function animateGalileo(dt) {
+    const g = galileoMoving; g.t += dt;
+    const colors = twinkle.stars.geometry.attributes.color;
+    for (let i = 0; i < colors.count; i++) { const b = .35 + .65 * (.5 + .5 * Math.sin(g.t * twinkle.speed[i] + twinkle.phase[i])) ** 3; colors.setXYZ(i, b, b, b * .92); }
+    colors.needsUpdate = true;
+    const flicker = 1 + Math.sin(g.t * 13) * .1 + Math.sin(g.t * 31.7) * .05 + Math.sin(g.t * 5.3) * .06;
+    g.flame.scale.set(.008 * (2 - flicker), .022 * flicker, .008 * (2 - flicker)); g.flame.rotation.z = Math.sin(g.t * 3.1) * .08;
+    g.halo.material.opacity = .75 + (flicker - 1) * 1.6;
+    if (g.writing) { g.writing.t += dt / 2.6; if (g.writing.t >= 1) { g.writing = null; g.cover.visible = false; } quillPose(g.writing?.t ?? 0); }
+    if (g.nudge > 0) {
+      g.nudge = Math.max(0, g.nudge - dt);
+      const swing = Math.sin((1 - g.nudge / 1.2) * Math.PI * 3) * (g.nudge / 1.2) * .025;
+      g.scope.quaternion.copy(g.aim).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), swing));
+    }
+  }
+  /** A new evening for the notebook: the quill writes its line, and the telescope is nudged to Jupiter's new place. */
+  function writeEvening(index) {
+    const rows = [...state.seen].sort((a, b) => a - b).slice(-16), slot = rows.indexOf(index);
+    if (slot < 0) return;
+    galileoMoving.writing = {t: 0, slot};
+    quillPose(0);
   }
 
   // ── The Webb ─────────────────────────────────────────────────────────
@@ -921,13 +1099,20 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   function openTelescope(night) {
     prepare();
     if (Number.isInteger(night)) state.night = night;
+    const fresh = state.nights && !state.seen.has(state.night);
     state.seen.add(state.night); paintNotebook();
+    if (fresh) writeEvening(state.night);
     open('telescope');
   }
   function stepNight(delta) {
     if (!state.nights) return;
+    const before = state.night;
     state.night = Math.max(0, Math.min(state.nights.length - 1, state.night + delta));
+    if (state.night === before) return;
+    const fresh = !state.seen.has(state.night);
     state.seen.add(state.night); paintNotebook(); drawPanel();
+    if (fresh) writeEvening(state.night);
+    galileoMoving.nudge = 1.2;   // the eye leaves the lens, and the tube is turned to Jupiter's new place
   }
   function setMode(mode) { state.mode = mode === 'above' ? 'above' : 'lens'; if (panel) drawPanel(); }
   function openPart(id) { state.part = PARTS[id] ? id : 'webb'; open('part'); }
@@ -961,7 +1146,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       visibleMoons: night ? night.moons.map(visible) : [], east: night ? night.moons.map(m => m[0]) : [],
       part: state.part, webb: {loaded: !!state.webb, error: state.webbError, meshes, triangles, size: state.webb?.userData.size || null,
         parts: hotspots.map(h => h.userData.part)},
-      jupiterPhoto: !!state.jupiter,
+      jupiterPhoto: !!state.jupiter, writing: !!galileoMoving.writing,
       exhibits: Object.fromEntries(exhibits.map(e => [e.id, e.getState()])),
       controls: panelTargets.filter(m => m.userData.label).map(m => ({label: m.userData.label, target: m.getWorldPosition(new THREE.Vector3()).toArray()}))
     };
@@ -973,12 +1158,13 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     get panel() { return panel; }, get panelTargets() { return panelTargets; },
     openTelescope, stepNight, setMode, openPart, openJupiter, closePanel, getState, exhibit,
     /** Each frame the visitor is in the room: the exhibits' own motion. */
-    update: dt => { for (const e of exhibits) e.update?.(dt); },
+    update: dt => { animateGalileo(dt); for (const e of exhibits) e.update?.(dt); },
     /** A key pressed on a screen, offered to whichever exhibit is listening; true if one took it. */
     key: key => exhibits.some(e => e.key?.(key)),
     /** Where things stand, for tests and the guide: world positions to aim at. */
     targets: () => ({
       telescope: scope.localToWorld(new THREE.Vector3()).toArray(),
+      notebook: galileoMoving.pages.localToWorld(new THREE.Vector3()).toArray(),
       webbLectern: lectern.localToWorld(new THREE.Vector3(0, 1.34, .04)).toArray(),
       centre: group.localToWorld(new THREE.Vector3()).toArray(),
       map: mapDesk.localToWorld(new THREE.Vector3(0, 1.38, .06)).toArray(),
