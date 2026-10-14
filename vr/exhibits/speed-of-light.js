@@ -98,7 +98,7 @@ export function createSpeedOfLight(kit, {angle}) {
   proxy.position.y = 1.05; table.add(proxy);
   kit.press(proxy, () => open(), 'Rømer’s orrery');
   const centre = kit.inRoom(wall, 0, 0);
-  kit.obstacle(centre.x, centre.z, 1.6); kit.medallion(centre.x, centre.z);
+  kit.medallion(centre.x, centre.z);
   {
     const p = kit.inRoom(wall, 2.1, 1.9);
     kit.plaque(p.x, p.z, 0, 0, [

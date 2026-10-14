@@ -35,9 +35,10 @@ const ROOM = {radius: 22, drum: 12, dome: 10};
 const ARRIVAL = {x: 0, z: 18.5, yaw: 0};
 // NASA's model looks along its +x; turned a quarter, its mirror faces the way in.
 const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
-// The floor the Webb stands on, roped off by a gilt ellipse: all of the
-// telescope lies inside 14.5 by 8.2 metres about its centre, and the rope
-// stands clear of that.
+// A gilt ellipse on the floor marks the Webb's ground: all of the telescope
+// lies inside 14.5 by 8.2 metres about its centre, and the ellipse stands
+// clear of that. It is not a barrier: visitors may walk through the Webb, and
+// through everything else in the rotunda, to look as close as they like.
 const ROPE = {along: 15.2, across: 8.9};
 // Where things stand round the wall, in degrees from the way in.
 const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108};
@@ -96,7 +97,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // The native museum does not have this gallery yet; its exporter leaves it out.
   group.userData.nativeSkip = true;
   scene.add(group);
-  const pickables = [], obstacles = [], hotspots = [];
+  const pickables = [], hotspots = [];
   // Every panel the room can show, by kind; the exhibits add their own.
   const panelSpecs = {};
   const state = {nights: null, night: 0, mode: 'lens', seen: new Set(), part: null, panelKind: null,
@@ -359,8 +360,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       leg.position.copy(foot).addScaledVector(span, .5); leg.quaternion.setFromUnitVectors(up, span.normalize()); stand.add(leg);
     }
     box(stand, [.12, .07, .16], [0, pivot.y - .08, 0], M.brass);
-    const at = inRoom(galileoWall, pivot.x, pivot.z);
-    obstacles.push({x: at.x, z: at.z, r: .55});
   }
   // The plaque before it, turned to the room.
   {
@@ -378,7 +377,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['A tube about a metre long, magnifying', .45, .028, '#a99a7c', 'italic #px Georgia, serif'],
       ['about twenty times.', .49, .028, '#a99a7c', 'italic #px Georgia, serif']]));
     press(plate, () => openTelescope(), 'Galileo plaque');
-    obstacles.push({x: at.x, z: at.z, r: .55});
   }
   // A desk with the visitor's notebook open on it: every evening they look at is written in.
   const book = {canvas: null, map: null};
@@ -394,7 +392,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const well = new THREE.Mesh(new THREE.CylinderGeometry(.035, .04, .06, 16), M.ink); well.position.set(.56, .82, -.2); desk.add(well);
     const quill = new THREE.Mesh(new THREE.ConeGeometry(.012, .32, 6), M.paper); quill.position.set(.56, .93, -.17); quill.rotation.set(.5, 0, -.25); desk.add(quill);
     press(pages, () => openTelescope(), 'Notebook');
-    obstacles.push({x: at.x, z: at.z, r: .95});
   }
 
   // ── The Webb ─────────────────────────────────────────────────────────
@@ -415,7 +412,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['to learn what it does.', .6, .052],
       ['Model: NASA, simplified for this museum', .74, .036, '#a99a7c', 'italic #px Georgia, serif']]));
     press(plate, () => openPart('webb'), 'Webb lectern');
-    obstacles.push({x: lectern.position.x, z: lectern.position.z, r: .9});
   }
   // Jupiter twice on the wall to the right: as Galileo saw it, and as Webb sees it.
   const jupiterFrames = {galileo: null, webb: null};
@@ -452,7 +448,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     press(back, () => callbacks.returnToMuseum?.(), 'Return to the museum');
     const scopeAgain = plane(desk, 1.3, .22, [0, .98, .1], lettering(1.3, .22, [['LOOK THROUGH GALILEO’S TELESCOPE', .11, .06, '#f1ddba', '600 #px Arial, sans-serif']]));
     press(scopeAgain, () => openTelescope(), 'Galileo from the desk');
-    obstacles.push({x: desk.position.x, z: desk.position.z, r: .9});
   }
   // ── The exhibitions, each its own module, built from the kit ──────────
   /**
@@ -464,7 +459,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     THREE, M, deg, radius: R, box, plane, lettering, canvasFor, texture, seeded, wrapped, board,
     onWall, inRoom, facing, press,
     medallion: (x, z) => medallions.push([x, z]),
-    obstacle: (x, z, r) => obstacles.push({x, z, r}),
     /** A panel of the exhibit's own: `paint` answers its canvas, `actions` its buttons, `zones` places on it to press. */
     panel: (kind, spec) => { panelSpecs[kind] = spec; },
     open: kind => open(kind), redraw: () => { if (panel) drawPanel(); }, close: () => closePanel(), showing: () => state.panelKind,
@@ -477,7 +471,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       const rake = new THREE.Group(); rake.position.set(0, 1.22, .03); rake.rotation.x = -.55; stand.add(rake);
       box(rake, [.94, .58, .03], [0, 0, -.02], M.gold);
       const plate = plane(rake, .9, .54, [0, 0, .001], lettering(.9, .54, lines));
-      press(plate, action, label); obstacles.push({x, z, r: .55});
+      press(plate, action, label);
       return plate;
     }
   };
@@ -790,13 +784,14 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   function closePanel() { if (panel) { disposePanel(panel); panel = null; panelTargets = []; } state.panelKind = null; }
 
   // ── Where a visitor may stand ────────────────────────────────────────
-  /** World coordinates; inside the rotunda's wall, outside the Webb's rope, clear of what stands. */
+  /**
+   * World coordinates; anywhere inside the rotunda's wall. Nothing in the room
+   * stops a visitor: they can step into the Webb, lean into the orrery or
+   * stand inside the press to see how it is made, and never be caught on an
+   * exhibit. Only the wall keeps them in.
+   */
   function validPosition(x, z) {
-    const lz = z - WING_Z;
-    if (Math.hypot(x, lz) > R - .6) return false;
-    if (((x - WEBB.x) / (ROPE.across + .3)) ** 2 + ((lz - WEBB.z) / (ROPE.along + .3)) ** 2 < 1) return false;
-    for (const o of obstacles) if (Math.hypot(x - o.x, lz - o.z) < o.r) return false;
-    return true;
+    return Math.hypot(x, z - WING_Z) <= R - .6;
   }
   const contains = z => Math.abs(z - WING_Z) < R + 2;
   /** How high a visitor may rise: under the dome, which is lower toward the wall. */

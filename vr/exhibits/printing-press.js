@@ -203,10 +203,6 @@ export function createPrintingPress(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.2, 1.0), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.set(0, 1.1, .1); press.add(proxy);
   kit.press(proxy, () => open(), 'Printing press');
-  // Solid: the press and its rail stand, the ink table, the type cases, and the posts of the line.
-  for (const [x, z, r] of [[0, 0, 1.0], [0, 1.25, .55], [-1.2, .45, .4], [1.42, .45, .6], [-2.1, -.9, .3], [2.1, -.9, .3], [0, -.9, .9]]) {
-    const at = kit.inRoom(wall, x, z); kit.obstacle(at.x, at.z, r);
-  }
   const front = kit.inRoom(wall, 0, 2.7); kit.medallion(front.x, front.z);
   {
     const p = kit.inRoom(wall, -2.3, 1.9);
