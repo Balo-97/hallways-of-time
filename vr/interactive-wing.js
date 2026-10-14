@@ -21,6 +21,8 @@
  */
 import {TEXTURE_CAP, TEXTURE_SCALE} from './detail.js';
 import {loadGLB} from './glb.js';
+import {createSpeedOfLight} from './exhibits/speed-of-light.js';
+import {createPrintingPress} from './exhibits/printing-press.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
@@ -38,7 +40,7 @@ const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
 // stands clear of that.
 const ROPE = {along: 15.2, across: 8.9};
 // Where things stand round the wall, in degrees from the way in.
-const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55};
+const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108};
 // Where Jupiter is painted in Galileo's window, from the middle of its sill: the telescope points there.
 const JUPITER_IN_WINDOW = {x: .25, y: 3.0};
 const MOON_ORBITS = [5.9, 9.4, 15, 26.4];   // mean distances, Jupiter radii
@@ -95,6 +97,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   group.userData.nativeSkip = true;
   scene.add(group);
   const pickables = [], obstacles = [], hotspots = [];
+  // Every panel the room can show, by kind; the exhibits add their own.
+  const panelSpecs = {};
   const state = {nights: null, night: 0, mode: 'lens', seen: new Set(), part: null, panelKind: null,
     webb: null, webbError: null, jupiter: null};
 
@@ -214,8 +218,9 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // name over the Webb, each discoverer on his own side, and over the door.
   const FRIEZE = {y: DRUM - 1.15, height: 1};
   {
-    const quarters = [[180, 'THE INTERACTIVE MUSEUM'], [-90, 'GALILEO GALILEI · PADUA · 1610'],
-      [90, 'THE JAMES WEBB SPACE TELESCOPE · 2021'], [0, 'LOOK WHERE THEY LOOKED']];
+    // Each side names who stands beneath it, in the order a visitor facing it reads them.
+    const quarters = [[180, 'THE INTERACTIVE MUSEUM'], [-90, 'GALILEO · PADUA 1610   ✦   RØMER · PARIS 1676'],
+      [90, 'GUTENBERG · MAINZ 1450   ✦   WEBB · 2021'], [0, 'LOOK WHERE THEY LOOKED   ✦   DO WHAT THEY DID']];
     // A quarter of the frieze is 34.5 m long and a metre high: 2,048 by 60 pixels keeps the letters square.
     for (const [angle, words] of quarters) {
       const c = document.createElement('canvas'); c.width = 2048; c.height = 60; const ctx = c.getContext('2d');
@@ -237,7 +242,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // Ivory pilasters every fifteen degrees, except where the door, the window and
   // the pictures are, standing up to the frieze rather than across it.
   {
-    const kept = [[PLACES.door, 6.5], [PLACES.galileo, 5.5], [PLACES.galileoView, 3.5], [PLACES.webbView, 4.5]];
+    const kept = [[PLACES.door, 6.5], [PLACES.galileo, 5.5], [PLACES.galileoView, 3.5], [PLACES.webbView, 4.5], [PLACES.press, 5]];
     const angles = [];
     for (let a = -172.5; a < 180; a += 15) if (!kept.some(([at, half]) => Math.abs(((a - at + 540) % 360) - 180) < half + 2.5)) angles.push(a);
     const top = FRIEZE.y - FRIEZE.height / 2 - .2, shaft = top - .3 - .34;
@@ -449,6 +454,36 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     press(scopeAgain, () => openTelescope(), 'Galileo from the desk');
     obstacles.push({x: desk.position.x, z: desk.position.z, r: .9});
   }
+  // ── The exhibitions, each its own module, built from the kit ──────────
+  /**
+   * What an exhibit is given to build itself with: the room's makers and
+   * materials, a frame on the wall to stand at, a panel of its own, and the
+   * way into the timeline's story of its moment.
+   */
+  const kit = {
+    THREE, M, deg, radius: R, box, plane, lettering, canvasFor, texture, seeded, wrapped, board,
+    onWall, inRoom, facing, press,
+    medallion: (x, z) => medallions.push([x, z]),
+    obstacle: (x, z, r) => obstacles.push({x, z, r}),
+    /** A panel of the exhibit's own: `paint` answers its canvas, `actions` its buttons, `zones` places on it to press. */
+    panel: (kind, spec) => { panelSpecs[kind] = spec; },
+    open: kind => open(kind), redraw: () => { if (panel) drawPanel(); }, close: () => closePanel(), showing: () => state.panelKind,
+    story: id => callbacks.story?.(id),
+    load: url => fetch(new URL(url, import.meta.url)).then(r => r.ok ? r.json() : Promise.reject(new Error(`${url} could not be loaded`))),
+    /** A plaque on a slate stand at x, z, turned to face tx, tz, that does `action` when pressed. */
+    plaque(x, z, tx, tz, lines, action, label) {
+      const stand = facing(new THREE.Group(), x, z, tx, tz);
+      box(stand, [.9, .95, .36], [0, .475, 0], M.slate); box(stand, [.98, .04, .44], [0, .97, 0], M.gold);
+      const rake = new THREE.Group(); rake.position.set(0, 1.22, .03); rake.rotation.x = -.55; stand.add(rake);
+      box(rake, [.94, .58, .03], [0, 0, -.02], M.gold);
+      const plate = plane(rake, .9, .54, [0, 0, .001], lettering(.9, .54, lines));
+      press(plate, action, label); obstacles.push({x, z, r: .55});
+      return plate;
+    }
+  };
+  const exhibits = [createSpeedOfLight(kit, {angle: PLACES.romer}), createPrintingPress(kit, {angle: PLACES.press})];
+  const exhibit = Object.fromEntries(exhibits.map(e => [e.id, e]));
+
   // The medallions, one draw for each of their three parts.
   {
     const o = new THREE.Object3D(), rings = [[1.75, .022], [1.56, .017]];
@@ -505,7 +540,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       image.onerror = () => { loading.photo = null; resolve(); };
       image.src = new URL('../assets/photos/webb-jupiter-2022.jpg', import.meta.url).href;
     });
-    return Promise.allSettled([loading.nights, loading.webb, loading.photo]);
+    for (const e of exhibits) if (e.prepare) loading[e.id] ??= e.prepare().catch(error => { loading[e.id] = null; console.warn(`The ${e.id} exhibit could not be loaded:`, error); });
+    return Promise.allSettled([loading.nights, loading.webb, loading.photo, ...exhibits.map(e => loading[e.id])]);
   }
   /**
    * Which part of the Webb the visitor is pointing at: where the ray meets the
@@ -710,17 +746,23 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     if (prior) { panel.position.copy(prior.position); panel.quaternion.copy(prior.quaternion); disposePanel(prior); }
     else callbacks.place?.(panel, 1.65);
     scene.add(panel); panelTargets = [];
-    const kind = state.panelKind;
-    const painted = kind === 'telescope' ? paintTelescope() : kind === 'part' ? paintPart() : paintJupiter();
-    const sheet = plane(panel, 1.8, 1.5, [0, 0, 0], new THREE.CanvasTexture(painted));
+    const spec = panelSpecs[state.panelKind];
+    const sheet = plane(panel, 1.8, 1.5, [0, 0, 0], new THREE.CanvasTexture(spec.paint()));
     sheet.material.map.colorSpace = THREE.SRGBColorSpace; sheet.userData.action = () => {}; panelTargets.push(sheet);
-    const actions = kind === 'telescope'
-      ? [['← EARLIER', () => stepNight(-1)], [state.mode === 'above' ? 'THE LENS' : 'FROM ABOVE', () => setMode(state.mode === 'above' ? 'lens' : 'above')], ['LATER →', () => stepNight(1)], ['CLOSE', closePanel]]
-      : kind === 'part'
-        ? [['← PART', () => stepPart(-1)], ['CLOSE', closePanel], ['PART →', () => stepPart(1)]]
-        : [['CLOSE', closePanel]];
-    actions.forEach(([text, fn], i) => button(text, fn, i, actions.length));
+    // Places on the sheet itself that can be pressed, given in the painting's own 1,200 by 1,000 units.
+    for (const zone of spec.zones?.() || []) {
+      const m = plane(panel, zone.w / 1200 * 1.8, zone.h / 1000 * 1.5, [(zone.x + zone.w / 2) / 1200 * 1.8 - .9, .75 - (zone.y + zone.h / 2) / 1000 * 1.5, .006], null);
+      m.material.visible = false; m.userData.action = zone.fn; m.userData.label = zone.label; panelTargets.push(m);
+    }
+    const actions = spec.actions();
+    actions.forEach(([text, fn, tone], i) => button(text, fn, i, actions.length, tone));
   }
+  Object.assign(panelSpecs, {
+    telescope: {paint: paintTelescope, actions: () => [['← EARLIER', () => stepNight(-1)],
+      [state.mode === 'above' ? 'THE LENS' : 'FROM ABOVE', () => setMode(state.mode === 'above' ? 'lens' : 'above')], ['LATER →', () => stepNight(1)], ['CLOSE', closePanel]]},
+    part: {paint: paintPart, actions: () => [['← PART', () => stepPart(-1)], ['CLOSE', closePanel], ['PART →', () => stepPart(1)]]},
+    jupiter: {paint: paintJupiter, actions: () => [['CLOSE', closePanel]]}
+  });
   function disposePanel(group) {
     group.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.map?.dispose(); o.material.dispose(); } });
     group.removeFromParent();
@@ -771,6 +813,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       part: state.part, webb: {loaded: !!state.webb, error: state.webbError, meshes, triangles, size: state.webb?.userData.size || null,
         parts: hotspots.map(h => h.userData.part)},
       jupiterPhoto: !!state.jupiter,
+      exhibits: Object.fromEntries(exhibits.map(e => [e.id, e.getState()])),
       controls: panelTargets.filter(m => m.userData.label).map(m => ({label: m.userData.label, target: m.getWorldPosition(new THREE.Vector3()).toArray()}))
     };
   }
@@ -778,14 +821,19 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     group, pickables, hotspots, contains, validPosition, ceilingAt, prepare, setEnvironment,
     arrival: {x: ARRIVAL.x, z: WING_Z + ARRIVAL.z, yaw: ARRIVAL.yaw},
     get panel() { return panel; }, get panelTargets() { return panelTargets; },
-    openTelescope, stepNight, setMode, openPart, openJupiter, closePanel, getState,
+    openTelescope, stepNight, setMode, openPart, openJupiter, closePanel, getState, exhibit,
+    /** Each frame the visitor is in the room: the exhibits' own motion. */
+    update: dt => { for (const e of exhibits) e.update?.(dt); },
+    /** A key pressed on a screen, offered to whichever exhibit is listening; true if one took it. */
+    key: key => exhibits.some(e => e.key?.(key)),
     /** Where things stand, for tests and the guide: world positions to aim at. */
     targets: () => ({
       telescope: scope.localToWorld(new THREE.Vector3()).toArray(),
       webbLectern: lectern.localToWorld(new THREE.Vector3(0, 1.34, .04)).toArray(),
       centre: group.localToWorld(new THREE.Vector3()).toArray(),
       jupiter: jupiterFrames.webb.getWorldPosition(new THREE.Vector3()).toArray(),
-      mirror: hotspots.find(h => h.userData.part === 'mirror')?.getWorldPosition(new THREE.Vector3()).toArray() || null
+      mirror: hotspots.find(h => h.userData.part === 'mirror')?.getWorldPosition(new THREE.Vector3()).toArray() || null,
+      ...Object.assign({}, ...exhibits.map(e => e.targets?.() || {}))
     })
   };
 }

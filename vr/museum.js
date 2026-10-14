@@ -639,6 +639,7 @@ function animate(){
   // In the interactive museum the hall bar keeps the hall the visitor came from.
   const room=roomAt(head.z);currentRoom=room;if(room!==INTERACTIVE)currentWing=Math.min(room,2);
   journey.update(dt,elapsed,head,comfort.gentle,viewPose,comfort.stillSculpture);
+  if(room===INTERACTIVE)wing.update(dt);
   if(room!==lastWing){lastWing=room;focusedIndex=-1;updateUI();}
   else if(room===GLOBE_ROOM&&(frameCounter&3)===0)updateGlobeUI();
   renderer.render(scene,camera);
@@ -731,6 +732,8 @@ function wireUI(){
   window.addEventListener('keydown',e=>{
     if(/INPUT|TEXTAREA/.test(e.target.tagName)||document.querySelector('dialog[open]'))return;
     const k=e.key.toLowerCase();
+    // An exhibit that takes typing (the printing press's type case) has the keys while its panel is open.
+    if(currentRoom===INTERACTIVE&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&wing?.key(e.key)){e.preventDefault();return;}
     if(['w','a','s','d','t','h','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){e.preventDefault();keys.add(k);return;}
     if(currentRoom!==GLOBE_ROOM||!globe)return;
     if(k===','){e.preventDefault();globe.step(-1);updateGlobeUI();}
@@ -765,6 +768,8 @@ async function init(){
     wing=createInteractiveWing(THREE,scene,{
       raycaster,materials:journey.materials,place:(group,distance)=>panelAt(group,distance),
       opened:()=>{closeStory();closeMenu();},returnToMuseum:()=>returnFromWing(),
+      // An exhibit's way into the timeline: the story of its moment, in the reading panel.
+      story:id=>showEvent(events.find(e=>e.id===id)),
       // The Webb's parts arrive with its model, after the rest of the museum.
       added:spots=>pickables.push(...spots)
     });
