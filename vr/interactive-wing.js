@@ -680,6 +680,64 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['Model: NASA, simplified for this museum', .74, .036, '#a99a7c', 'italic #px Georgia, serif']]));
     press(plate, () => openPart('webb'), 'Webb lectern');
   }
+  // Across the way from the lectern, a small orrery of where the Webb works: L2, a million and a half
+  // kilometres beyond the Earth, always behind it, circling a point it cannot stop at, its sunshield
+  // turned to the Sun, the Earth and the Moon together. Drawn far closer than it is.
+  const orrery = facing(new THREE.Group(), 3.8, ARRIVAL.z - 4.4, ARRIVAL.x, ARRIVAL.z);
+  const l2 = {year: 0};
+  {
+    const turned = (profile, material) => { const m = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), 40), material); orrery.add(m); return m; };
+    turned([[0, 0], [.3, 0], [.3, .04], [.2, .07], [.08, .12], [.06, .7], [.1, .8], [.56, .84], [.58, .88], [0, .88]], M.slate);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(.57, .014, 6, 64), M.gold); rim.rotation.x = Math.PI / 2; rim.position.y = .875; orrery.add(rim);
+    const sky = new THREE.Mesh(new THREE.CircleGeometry(.55, 48), new THREE.MeshBasicMaterial({map: (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 512; const ctx = c.getContext('2d'), r = seeded(15);
+      const g = ctx.createRadialGradient(256, 256, 10, 256, 256, 256); g.addColorStop(0, '#1b2440'); g.addColorStop(1, '#0a0e1c');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 400; i++) { ctx.fillStyle = `rgba(255,246,220,${.2 + r() * .6})`; ctx.fillRect(r() * 512, r() * 512, 1.5, 1.5); }
+      ctx.strokeStyle = 'rgba(201,166,100,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(256, 256, 256 * .36 / .55, 0, Math.PI * 2); ctx.stroke();
+      // Lettered along the front edge, to read from where the visitor stands.
+      ctx.textAlign = 'center'; ctx.fillStyle = '#e1c393'; ctx.font = '600 26px Arial'; ctx.fillText('WHERE THE WEBB IS', 256, 452);
+      ctx.fillStyle = '#c8b793'; ctx.font = 'italic 19px Georgia'; ctx.fillText('L2: 1.5 million km beyond the Earth, drawn far closer', 256, 480);
+      return texture(c);
+    })()}));
+    sky.rotation.x = -Math.PI / 2; sky.position.y = .882; orrery.add(sky);
+    const glow = document.createElement('canvas'); glow.width = glow.height = 64;
+    { const ctx = glow.getContext('2d'), g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,240,190,1)'); g.addColorStop(.3, 'rgba(255,200,90,.6)'); g.addColorStop(1, 'rgba(255,180,60,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64); }
+    l2.sun = new THREE.Mesh(new THREE.SphereGeometry(.05, 24, 16), new THREE.MeshBasicMaterial({color: '#ffd77a'})); l2.sun.position.y = 1.0; orrery.add(l2.sun);
+    l2.corona = new THREE.Sprite(new THREE.SpriteMaterial({map: texture(glow), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true})); l2.corona.scale.setScalar(.3); l2.corona.position.y = 1.0; orrery.add(l2.corona);
+    l2.earth = new THREE.Mesh(new THREE.SphereGeometry(.026, 20, 14), new THREE.MeshStandardMaterial({color: '#4f86c6', roughness: .5, emissive: '#16304a'})); orrery.add(l2.earth);
+    l2.moon = new THREE.Mesh(new THREE.SphereGeometry(.008, 10, 8), new THREE.MeshStandardMaterial({color: '#c8c4bc'})); orrery.add(l2.moon);
+    // L2 itself: a faint ring marking a place with nothing at it.
+    l2.point = new THREE.Mesh(new THREE.TorusGeometry(.012, .002, 6, 24), new THREE.MeshBasicMaterial({color: '#e1c393'})); orrery.add(l2.point);
+    // The Webb: a gold hexagon of mirror on a violet diamond of sunshield.
+    l2.webb = new THREE.Group(); orrery.add(l2.webb);
+    const shield = new THREE.Mesh(new THREE.CircleGeometry(.03, 4), new THREE.MeshStandardMaterial({color: '#b49ac4', roughness: .35, metalness: .4, side: THREE.DoubleSide}));
+    shield.scale.set(1.5, 1, 1); shield.rotation.y = Math.PI / 2; l2.webb.add(shield);
+    const mirror = new THREE.Mesh(new THREE.CircleGeometry(.014, 6), new THREE.MeshStandardMaterial({color: '#f4cd66', metalness: .8, roughness: .25, side: THREE.DoubleSide}));
+    mirror.position.set(.012, 0, 0); mirror.rotation.y = Math.PI / 2; l2.webb.add(mirror);
+    // Its halo orbit, drawn round L2.
+    const ring = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({length: 48}, (_, i) => new THREE.Vector3(0, Math.cos(i / 48 * Math.PI * 2) * .04, Math.sin(i / 48 * Math.PI * 2) * .025))),
+      new THREE.LineBasicMaterial({color: '#c9a664', transparent: true, opacity: .5}));
+    l2.halo = ring; orrery.add(ring);
+    const pick = new THREE.Mesh(new THREE.CylinderGeometry(.6, .6, .5, 16), invisible); pick.position.y = .95; orrery.add(pick);
+    press(pick, () => openPart('webb'), 'Where the Webb is');
+  }
+  moving.push(l2.earth, l2.moon, l2.point, l2.webb, l2.halo, l2.corona);
+  /** A year in twenty-four seconds: the Earth round the Sun, L2 behind it, the Webb round L2 twice a year. */
+  function animateOrrery(dt) {
+    l2.year = (l2.year + dt * Math.PI * 2 / 24) % (Math.PI * 2);
+    const a = l2.year, R = .36, y = 1.0;
+    l2.earth.position.set(Math.cos(a) * R, y, Math.sin(a) * R); l2.earth.rotation.y += dt * 3;
+    const m = a * 13.4;
+    l2.moon.position.set(l2.earth.position.x + Math.cos(m) * .05, y + Math.sin(m) * .01, l2.earth.position.z + Math.sin(m) * .05);
+    const L = R + .1;
+    l2.point.position.set(Math.cos(a) * L, y, Math.sin(a) * L); l2.point.rotation.y = -a;
+    l2.halo.position.copy(l2.point.position); l2.halo.rotation.y = -a;
+    const h = a * 2;
+    l2.webb.position.copy(l2.point.position).add(new THREE.Vector3(0, Math.cos(h) * .04, 0)).addScaledVector(new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)), Math.sin(h) * .025);
+    l2.webb.rotation.set(0, -a, 0);   // its sunshield to the Sun, the mirror in the shade behind
+    l2.corona.scale.setScalar(.3 * (1 + Math.sin(a * 9) * .04));
+  }
   // ── The exhibitions, each its own module, built from the kit ──────────
   /**
    * What an exhibit is given to build itself with: the room's makers and
@@ -801,6 +859,44 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   }
   settle(group, moving);
 
+  /**
+   * Now and then a band of light runs across the gold mirror, as across a
+   * mirror turned in the light: the mirror drawn a second time over itself,
+   * bright only in a band that sweeps from one side to the other.
+   */
+  const glint = {mesh: null, material: null, from: 0, to: 0, t: 0};
+  function addGlint(model) {
+    // Named twice, as a group and as the mesh within it: the mesh is the one wanted.
+    let gold = null; model.traverse(o => { if (o.isMesh && o.name === 'gold mirror') gold = o; });
+    if (!gold) return;
+    gold.geometry.computeBoundingBox();
+    const box3 = gold.geometry.boundingBox, size = box3.getSize(new THREE.Vector3());
+    // Across the mirror's face: the diagonal of its two widest extents.
+    const order = [0, 1, 2].sort((p, q) => size.getComponent(q) - size.getComponent(p)), dir = new THREE.Vector3();
+    dir.setComponent(order[0], 1); dir.setComponent(order[1], .6); dir.normalize();
+    const corners = [];
+    for (const x of [box3.min.x, box3.max.x]) for (const y of [box3.min.y, box3.max.y]) for (const z of [box3.min.z, box3.max.z]) corners.push(x * dir.x + y * dir.y + z * dir.z);
+    glint.from = Math.min(...corners) - 1; glint.to = Math.max(...corners) + 1;
+    glint.material = new THREE.ShaderMaterial({
+      uniforms: {sweep: {value: glint.from}, dir: {value: dir}},
+      vertexShader: 'varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform float sweep; uniform vec3 dir; varying vec3 vPos; void main() { float d = dot(vPos, dir) - sweep; gl_FragColor = vec4(vec3(1.0, .86, .55) * exp(-d * d / .5) * .5, 1.0); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+    });
+    // Beside the model rather than in it, so the model itself stays at its eight draws; placed where the mirror is.
+    glint.mesh = new THREE.Mesh(gold.geometry, glint.material);
+    webbPlace.updateWorldMatrix(true, false); gold.updateWorldMatrix(true, false);
+    glint.mesh.matrixAutoUpdate = false; glint.mesh.matrix.copy(webbPlace.matrixWorld).invert().multiply(gold.matrixWorld); glint.mesh.renderOrder = 2;
+    webbPlace.add(glint.mesh);
+  }
+  function animateGlint(dt) {
+    if (!glint.material) return;
+    glint.t = (glint.t + dt) % 9;   // a sweep of two seconds, every nine
+    glint.material.uniforms.sweep.value = glint.from + (glint.to - glint.from) * Math.min(1, glint.t / 2.2);
+    glint.mesh.visible = glint.t < 2.2;
+  }
+
   // ── Loading what comes from files ────────────────────────────────────
   let environment = null;
   function setEnvironment(map) {
@@ -820,6 +916,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     loading.webb ??= loadGLB(THREE, new URL('../assets/models/webb.glb', import.meta.url).href).then(model => {
       model.traverse(o => { if (o.isMesh) { o.matrixAutoUpdate = false; o.updateMatrix(); } });
       webbPlace.add(model); state.webb = model; state.webbError = null;
+      addGlint(model);
       if (environment) setEnvironment(environment);
       // Where each named part lies, as boxes to aim at.
       for (const [id, region] of Object.entries(model.userData.regions || {})) {
@@ -1090,7 +1187,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       visibleMoons: night ? night.moons.map(visible) : [], east: night ? night.moons.map(m => m[0]) : [],
       part: state.part, webb: {loaded: !!state.webb, error: state.webbError, meshes, triangles, size: state.webb?.userData.size || null,
         parts: hotspots.map(h => h.userData.part)},
-      jupiterPhoto: exhibit.jupiters.getState().photo, writing: !!galileoMoving.writing,
+      jupiterPhoto: exhibit.jupiters.getState().photo, writing: !!galileoMoving.writing, glint: !!glint.material, l2: Math.round(l2.year * 100) / 100,
       exhibits: Object.fromEntries(exhibits.map(e => [e.id, e.getState()])),
       controls: panelTargets.filter(m => m.userData.label).map(m => ({label: m.userData.label, target: m.getWorldPosition(new THREE.Vector3()).toArray()}))
     };
@@ -1102,7 +1199,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     get panel() { return panel; }, get panelTargets() { return panelTargets; },
     openTelescope, stepNight, setMode, openPart, openJupiter, closePanel, getState, exhibit,
     /** Each frame the visitor is in the room: the exhibits' own motion. */
-    update: dt => { animateGalileo(dt); for (const e of exhibits) e.update?.(dt); },
+    update: dt => { animateGalileo(dt); animateOrrery(dt); animateGlint(dt); for (const e of exhibits) e.update?.(dt); },
     /** A key pressed on a screen, offered to whichever exhibit is listening; true if one took it. */
     key: key => exhibits.some(e => e.key?.(key)),
     /** Where things stand, for tests and the guide: world positions to aim at. */
@@ -1112,6 +1209,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       webbLectern: lectern.localToWorld(new THREE.Vector3(0, 1.34, .04)).toArray(),
       centre: group.localToWorld(new THREE.Vector3()).toArray(),
       map: mapDesk.localToWorld(new THREE.Vector3(0, 1.38, .06)).toArray(),
+      orrery: orrery.localToWorld(new THREE.Vector3(0, 1.0, 0)).toArray(),
       mirror: hotspots.find(h => h.userData.part === 'mirror')?.getWorldPosition(new THREE.Vector3()).toArray() || null,
       ...Object.assign({}, ...exhibits.map(e => e.targets?.() || {}))
     })
