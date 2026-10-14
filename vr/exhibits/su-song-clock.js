@@ -69,7 +69,8 @@ export function createSuSongClock(kit, {angle}) {
   const water = new THREE.MeshStandardMaterial({color: '#4f9ccf', roughness: .12, metalness: .1, transparent: true, opacity: .82});
 
   // ── The tower ────────────────────────────────────────────────────────
-  const wall = kit.onWall(angle, kit.STAGE);
+  // A quarter larger than at first: a little over four metres to the top of its roof.
+  const wall = kit.onWall(angle, kit.STAGE, 1.25);
   const tower = new THREE.Group(); wall.add(tower);
   // A stone platform of two tiers, a low red balustrade round the upper.
   box(tower, [3.05, .12, 2.3], [0, .06, 0], stone);
@@ -332,7 +333,7 @@ export function createSuSongClock(kit, {angle}) {
   kit.press(proxy, () => open(), 'Su Song’s clock tower');
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['SU SONG’S CLOCK TOWER', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Kaifeng, 1092 · a model, much smaller', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['Water fills a bucket; the bucket tips a balance;', .22, .033],

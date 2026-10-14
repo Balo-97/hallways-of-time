@@ -33,7 +33,8 @@ export function createBigBangEcho(kit, {angle}) {
   const canvas = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); return c; };
 
   // ── The oldest light, on the wall ────────────────────────────────────
-  const wall = kit.onWall(angle, .12);
+  // The oldest light a fifth larger than at first, and held a little off the wall, which curves away behind it.
+  const wall = kit.onWall(angle, .2, 1.2);
   const MAP = {w: 4.6, h: 2.3, y: 4.0};
   /**
    * An impression of the sky in microwaves: smoothed noise at three sizes,
@@ -95,7 +96,8 @@ export function createBigBangEcho(kit, {angle}) {
   kit.moving(sky, ...captions);
 
   // ── The horn antenna, on its turntable ───────────────────────────────
-  const stage = kit.onWall(angle, kit.STAGE);
+  // The horn and its receiver a quarter larger than at first.
+  const stage = kit.onWall(angle, kit.STAGE, 1.25);
   const steel = new THREE.MeshStandardMaterial({color: '#7d868e', metalness: .55, roughness: .45});
   const panels = new THREE.MeshStandardMaterial({color: '#ffffff', roughness: .55, map: kit.texture(canvas(256, 256, (ctx, w, h) => {
     ctx.fillStyle = '#dfe2e1'; ctx.fillRect(0, 0, w, h);
@@ -192,7 +194,7 @@ export function createBigBangEcho(kit, {angle}) {
   kit.press(skyProxy, () => open('light'), 'The oldest light');
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['THE ECHO OF THE BIG BANG', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Penzias and Wilson, Holmdel, 1965', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['A hiss from every direction, the same day and', .22, .033],

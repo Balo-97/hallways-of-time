@@ -143,11 +143,12 @@ export function createTuringMachine(kit, {angle}) {
   // ── The rule card, on an easel behind ────────────────────────────────
   const card = document.createElement('canvas'); card.width = 1040; card.height = 640;
   const cardMap = kit.texture(card);
-  const easel = new THREE.Group(); easel.position.set(0, 1.62, -.34); easel.rotation.x = -.08; desk.add(easel);
+  // Half as large again as a desk card, so its rules read from where a visitor stands.
+  const easel = new THREE.Group(); easel.position.set(0, 1.8, -.36); easel.rotation.x = -.08; easel.scale.setScalar(1.45); desk.add(easel);
   box(easel, [1.46, .9, .04], [0, 0, -.02], oak);
   box(easel, [1.5, .94, .02], [0, 0, -.045], M.gold);
   const cardPlane = plane(easel, 1.36, .8, [0, 0, .002], cardMap);
-  for (const side of [-1, 1]) box(desk, [.04, 1.0, .04], [side * .62, TOP + .42, -.37], oak);
+  for (const side of [-1, 1]) box(desk, [.045, 1.2, .045], [side * .9, TOP + .55, -.4], oak);
   // The gold bar that glides to the rule in use.
   const RULES = {x: 40, y: 160, w: 960, row: 70};   // where the rows are on the card, in its pixels
   const bar = new THREE.Mesh(new THREE.PlaneGeometry(RULES.w / 1040 * 1.36, (RULES.row - 6) / 640 * .8), new THREE.MeshBasicMaterial({color: '#e8b84a', transparent: true, opacity: .35, depthWrite: false, blending: THREE.AdditiveBlending}));
@@ -249,7 +250,7 @@ export function createTuringMachine(kit, {angle}) {
   kit.press(proxy, () => open(), 'Turing machine');
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['ON COMPUTABLE NUMBERS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Alan Turing, Cambridge, 1936', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['A tape, a head that reads one square, and a', .22, .033],

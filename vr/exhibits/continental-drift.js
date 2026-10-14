@@ -45,7 +45,8 @@ export function createContinentalDrift(kit, {angle}) {
   /** A place on the globe: the same mapping three.js's sphere uses for its texture. */
   const at = (lat, lon) => new THREE.Vector3(Math.cos(lat * deg) * Math.cos(lon * deg), Math.sin(lat * deg), -Math.cos(lat * deg) * Math.sin(lon * deg));
   const axis = at(FIT.lat, FIT.lon);
-  const wall = kit.onWall(angle, kit.STAGE);
+  // Larger than life, globe and tank, so the coasts, the fossils and the stripes read from a few steps away.
+  const wall = kit.onWall(angle, kit.STAGE, 1.25);
   const turned = (parent, profile, material, segments = 32) => {
     const m = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments), material); parent.add(m); return m;
   };
@@ -62,7 +63,7 @@ export function createContinentalDrift(kit, {angle}) {
 
   // ── The globe, on a library stand ────────────────────────────────────
   const stand = new THREE.Group(); stand.position.x = -1.3; wall.add(stand);
-  const RADIUS = .55, CENTRE = 1.42, HORIZON = {inner: RADIUS + .08, outer: RADIUS + .25, y: 1.42 - .12};
+  const RADIUS = .55, CENTRE = 1.25, HORIZON = {inner: RADIUS + .08, outer: RADIUS + .25, y: 1.25 - .12};   // its middle at the eye, once enlarged
   const LEG = (HORIZON.inner + HORIZON.outer) / 2;
   for (let i = 0; i < 4; i++) {
     const a = Math.PI / 4 + i * Math.PI / 2, leg = new THREE.Group(); leg.position.set(Math.cos(a) * LEG, 0, Math.sin(a) * LEG); stand.add(leg);
@@ -384,7 +385,7 @@ export function createContinentalDrift(kit, {angle}) {
 
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['CONTINENTAL DRIFT', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Wegener, 1912 · the seafloor, 1960s', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['On the globe, wind South America back to', .22, .033],

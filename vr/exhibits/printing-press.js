@@ -207,7 +207,7 @@ export function createPrintingPress(kit, {angle}) {
   kit.press(proxy, () => open(), 'Printing press');
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['THE PRINTING PRESS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Johannes Gutenberg, Mainz, about 1450', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['Screw presses were old; Gutenberg’s invention', .22, .033],

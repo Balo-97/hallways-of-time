@@ -40,7 +40,8 @@ export function createDoubleHelix(kit, {angle}) {
   const state = {paired: 0, popped: new Array(N).fill(-1), mode: 'build', copy: -1, spin: 0, feedback: null, clock: 0, reject: null};
 
   // ── The plinth ───────────────────────────────────────────────────────
-  const wall = kit.onWall(angle, kit.STAGE);
+  // A third larger than at first, so its letters and bonds read from a few steps away.
+  const wall = kit.onWall(angle, kit.STAGE, 1.3);
   const plinth = new THREE.Group(); wall.add(plinth);
   const turned = (profile, material, segments = 48) => { const m = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments), material); plinth.add(m); return m; };
   turned([[0, 0], [.86, 0], [.86, .06], [.8, .09], [.78, .12], [0, .12]], M.slate);
@@ -168,7 +169,7 @@ export function createDoubleHelix(kit, {angle}) {
   kit.press(proxy, () => open(), 'The double helix');
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['THE DOUBLE HELIX', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Cambridge and London, 1953', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['Two strands, wound round each other and held', .22, .033],

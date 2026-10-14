@@ -50,7 +50,8 @@ export function createSpeedOfLight(kit, {angle}) {
 
   // ── The table and its orrery ─────────────────────────────────────────
   const wall = kit.onWall(angle, kit.STAGE);
-  const table = new THREE.Group(); wall.add(table);
+  // The orrery and its table larger than life, so the year on its face reads standing back; the clock stays a clock.
+  const table = new THREE.Group(); table.scale.setScalar(1.3); wall.add(table);
   const mahogany = new THREE.MeshStandardMaterial({color: '#5a2a1a', roughness: .42, metalness: .05});
   const brass = M.brass;
   const up = new THREE.Vector3(0, 1, 0), span = new THREE.Vector3();
@@ -232,11 +233,12 @@ export function createSpeedOfLight(kit, {angle}) {
   const clockState = {t: 0, second: -1};
   // Pressing the table, or anything on it, looks at the year.
   const proxy = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, .5, 24), new THREE.MeshBasicMaterial({visible: false}));
-  proxy.position.y = 1.05; table.add(proxy);
+  // Turned half a segment, so a press from straight in front never runs exactly along an edge and misses both faces.
+  proxy.position.y = 1.05; proxy.rotation.y = Math.PI / 24; table.add(proxy);
   kit.press(proxy, () => open(), 'Rømer’s orrery');
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['THE SPEED OF LIGHT', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Ole Rømer, Paris, 1676', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['Io vanishes into Jupiter’s shadow every', .22, .033],

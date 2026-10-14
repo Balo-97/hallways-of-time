@@ -104,8 +104,9 @@ export function createPeriodicTable(kit, {angle}) {
   const state = {z: 6, mode: 'origins', pulled: 6, lit: null, clock: 0};
 
   // ── The cabinet ──────────────────────────────────────────────────────
-  const wall = kit.onWall(angle, .26);
-  const W = COLS * CELL, H = ROWS * CELL, BOTTOM = .72;
+  // Drawn a third larger than at first, so the symbols read from across the bay.
+  const wall = kit.onWall(angle, .26, 1.3);
+  const W = COLS * CELL, H = ROWS * CELL, BOTTOM = 1.0;
   const display = new THREE.Group(); display.position.y = BOTTOM + H / 2; wall.add(display);
   const cellCentre = e => new THREE.Vector3((e.col + .5) * CELL - W / 2, H / 2 - (e.row + .5) * CELL, .004);
   box(display, [W + .5, H + .5, .06], [0, 0, -.04], M.slate);
@@ -374,19 +375,23 @@ export function createPeriodicTable(kit, {angle}) {
     ['WHERE YOUR ATOMS WERE MADE', .14, .13, '#e1c393', '600 #px Arial, sans-serif'], ['The periodic table, coloured by what made each element', .27, .07, '#c8b793', 'italic #px Georgia, serif']], '#23303b'));
   const KEYS = ['bang', 'small', 'big', 'dwarf', 'merge', 'rays', 'none', 'made'];
   {
-    const c = document.createElement('canvas'); c.width = 2048; c.height = 96; const ctx = c.getContext('2d');
-    ctx.fillStyle = '#23303b'; ctx.fillRect(0, 0, 2048, 96);
+    // In two rows of four, lettered large enough to read from the middle of the bay.
+    const KEY = {w: 2048, h: 210, row: 105, cell: 512};
+    const c = document.createElement('canvas'); c.width = KEY.w; c.height = KEY.h; const ctx = c.getContext('2d');
+    ctx.fillStyle = '#23303b'; ctx.fillRect(0, 0, KEY.w, KEY.h);
     KEYS.forEach((key, i) => {
-      const x = 20 + i * 254; ctx.fillStyle = SOURCES[key].color; ctx.fillRect(x, 30, 40, 40);
-      ctx.fillStyle = '#f1ddba'; ctx.font = '600 22px Arial'; ctx.fillText(SOURCES[key].short, x + 52, 58, 196);
+      const x = 24 + (i % 4) * KEY.cell, y = Math.floor(i / 4) * KEY.row;
+      ctx.fillStyle = SOURCES[key].color; ctx.fillRect(x, y + 26, 54, 54);
+      ctx.fillStyle = '#f1ddba'; ctx.font = '600 36px Arial'; ctx.fillText(SOURCES[key].short, x + 70, y + 66, KEY.cell - 96);
     });
-    const key = plane(display, W, W * 96 / 2048, [0, -H / 2 - .42, .01], kit.texture(c));
+    const tall = W * KEY.h / KEY.w;
+    const key = plane(display, W, tall, [0, -H / 2 - .3 - tall / 2, .01], kit.texture(c));
     const local = new THREE.Vector3();
     kit.press(key, hit => {
       if (!hit?.point) return;
       key.worldToLocal(local.copy(hit.point));
-      const i = Math.floor(((local.x / W + .5) * 2048 - 20) / 254);
-      if (KEYS[i]) light(KEYS[i]);
+      const column = Math.floor((local.x / W + .5) * 4), row = local.y > 0 ? 0 : 1;
+      if (KEYS[row * 4 + column]) light(KEYS[row * 4 + column]);
     }, 'The key to the colours');
   }
   // One plane over the table to press; the tile under the point is worked out from where it was hit.
@@ -405,7 +410,7 @@ export function createPeriodicTable(kit, {angle}) {
   }
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['THE PERIODIC TABLE', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Mendeleev, St Petersburg, 1869', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['Every element, coloured by where its atoms', .22, .033],

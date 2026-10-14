@@ -154,8 +154,9 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(...size), material); m.position.set(...position); parent.add(m); return m;
   };
   const SIGN_PX = Math.round(680 * TEXTURE_SCALE);
-  // Plaques are read from arm's length, where a Quest 3 resolves some 950 pixels a metre.
-  const PLAQUE_PX = Math.round(960 * TEXTURE_SCALE);
+  // Signs are lettered large enough to read from a few steps away, so 720 texels a metre
+  // gives each letter more texture than the small plaques had at 960.
+  const PLAQUE_PX = Math.round(720 * TEXTURE_SCALE);
   function canvasFor(width, height, density = SIGN_PX) {
     const px = Math.min(density, TEXTURE_CAP / Math.max(width, height));
     const c = document.createElement('canvas'); c.width = Math.round(width * px); c.height = Math.round(height * px);
@@ -232,12 +233,14 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   /**
    * A frame on the wall at `angle` degrees from the way in, `inset` metres in
    * from it: x runs along the wall to the right of someone facing it, y up,
-   * and z out from the wall toward the centre of the room.
+   * and z out from the wall toward the centre of the room. `scale` draws
+   * whatever is built in it that much larger, about its foot.
    */
-  function onWall(angle, inset = 0) {
+  function onWall(angle, inset = 0, scale = 1) {
     const a = angle * deg, frame = new THREE.Group();
     frame.position.set(Math.sin(a) * (R - inset), 0, Math.cos(a) * (R - inset));
-    frame.rotation.y = a + Math.PI; frame.updateMatrix();
+    // Larger than life, for models whose lettering should read from a few steps away.
+    frame.rotation.y = a + Math.PI; frame.scale.setScalar(scale); frame.updateMatrix();
     group.add(frame);
     return frame;
   }
@@ -253,10 +256,15 @@ export function createInteractiveWing(THREE, scene, callbacks) {
    * Where every bay's plaque stands: at its front right, seven and a half degrees
    * round from the bay's middle and 22 metres from the centre — the middle of a
    * square of the floor — so the plaques make one even ring round the room.
+   * Each is turned to the place a visitor stands before its bay.
    */
-  const plaqueAt = angle => { const a = (angle - 7.5) * deg; return {x: Math.sin(a) * 22, z: Math.cos(a) * 22}; };
+  const plaqueAt = angle => {
+    const a = (angle - 7.5) * deg, to = standAt(angle);
+    // Turned to where a visitor stands before the bay, so it is read face on from there.
+    return {x: Math.sin(a) * 22, z: Math.cos(a) * 22, tx: to.x, tz: to.z};
+  };
   /** Where a visitor stands to see the exhibit in a bay, and which way they face: toward it. */
-  const standAt = angle => { const a = angle * deg, r = R - STAGE - 3.4; return {x: Math.sin(a) * r, z: Math.cos(a) * r, yaw: a + Math.PI}; };
+  const standAt = angle => { const a = angle * deg, r = R - STAGE - 4; return {x: Math.sin(a) * r, z: Math.cos(a) * r, yaw: a + Math.PI}; };
   const bayOf = id => BAYS.find(b => b.id === id);
 
   /**
@@ -554,19 +562,34 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const pin = new THREE.Mesh(new THREE.CylinderGeometry(.006, .006, .09, 10), M.brass); pin.rotation.z = Math.PI / 2; fork.add(pin);
   }
   /** A plaque on a slate stand at x, z, turned to face tx, tz, that does `action` when pressed. */
-  function plaque(x, z, tx, tz, lines, action, label) {
-    const stand = facing(new THREE.Group(), x, z, tx, tz);
-    box(stand, [.9, .95, .36], [0, .475, 0], M.slate); box(stand, [.98, .04, .44], [0, .97, 0], M.gold);
-    const rake = new THREE.Group(); rake.position.set(0, 1.22, .03); rake.rotation.x = -.55; stand.add(rake);
-    box(rake, [.94, .58, .03], [0, 0, -.02], M.gold);
-    const plate = plane(rake, .9, .54, [0, 0, .001], lettering(.9, .54, lines, undefined, PLAQUE_PX));
+  /**
+   * A sign on a pedestal: the plate stands nearly upright, tipped back a little,
+   * its middle a little below the eye, so it reads from a few steps away and
+   * not only from over it. `lines` are laid out on the plate in its own metres.
+   */
+  function sign(stand, width, height, lines, action, label) {
+    const top = .84, tilt = .22;
+    box(stand, [width * .7, top, .34], [0, top / 2, 0], M.slate); box(stand, [width * .7 + .08, .04, .42], [0, top + .02, 0], M.gold);
+    const face = new THREE.Group(); face.position.set(0, top + .04 + height / 2 * Math.cos(tilt), .02); face.rotation.x = -tilt; stand.add(face);
+    box(face, [width + .05, height + .05, .03], [0, 0, -.02], M.gold);
+    const plate = plane(face, width, height, [0, 0, .001], lettering(width, height, lines, undefined, PLAQUE_PX));
     press(plate, action, label);
     return plate;
+  }
+  /** Lines laid out for one plate, drawn `k` times larger on a plate `k` times the size. */
+  const larger = (lines, k) => lines.map(([text, y, size, ...rest]) => [text, y * k, size * k, ...rest]);
+  /**
+   * Every bay's plaque: the lines are written for a plate 0.9 by 0.54 metres,
+   * and drawn on one 1.42 by 0.85, half as large again and more.
+   */
+  function plaque(x, z, tx, tz, lines, action, label) {
+    const K = .85 / .54;
+    return sign(facing(new THREE.Group(), x, z, tx, tz), .9 * K, .85, larger(lines, K), action, label);
   }
   // Its plaque at the front right of the stage, as every bay's is.
   {
     const at = plaqueAt(bayOf('galileo').angle);
-    plaque(at.x, at.z, 0, 0, [
+    plaque(at.x, at.z, at.tx, at.tz, [
       ['GALILEO’S TELESCOPE', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Padua, January 1610', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['On 7 January 1610 Galileo turned a telescope', .22, .033],
@@ -721,23 +744,22 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const besideWebb = side => ({x: side * Math.sin(18.75 * deg) * 12, z: Math.cos(18.75 * deg) * 12});
   const lectern = facing(new THREE.Group(), besideWebb(-1).x, besideWebb(-1).z, ARRIVAL.x, ARRIVAL.z);
   {
-    box(lectern, [1.5, 1.0, .46], [0, .5, 0], M.slate); box(lectern, [1.58, .045, .54], [0, 1.02, 0], M.gold);
-    const rake = new THREE.Group(); rake.position.set(0, 1.34, .04); rake.rotation.x = -.52; lectern.add(rake);
-    box(rake, [1.52, .9, .04], [0, 0, -.03], M.gold);
-    const plate = plane(rake, 1.44, .82, [0, 0, .001], lettering(1.44, .82, [
+    // Its lines are written for a plate 1.44 by 0.82, and drawn on one 1.9 by 1.08.
+    const K = 1.08 / .82;
+    sign(lectern, 1.44 * K, 1.08, larger([
       ['THE JAMES WEBB SPACE TELESCOPE', .11, .06, '#e1c393', '600 #px Arial, sans-serif'],
       ['Full size. Launched 25 December 2021.', .2, .048, '#c8b793', 'italic #px Georgia, serif'],
       ['Its sunshield is as large as a tennis court;', .33, .052],
       ['its gold mirror is 6.5 metres across.', .41, .052],
       ['Point at any part of the telescope', .52, .052],
       ['to learn what it does.', .6, .052],
-      ['Model: NASA, simplified for this museum', .74, .036, '#a99a7c', 'italic #px Georgia, serif']]));
-    press(plate, () => openPart('webb'), 'Webb lectern');
+      ['Model: NASA, simplified for this museum', .74, .036, '#a99a7c', 'italic #px Georgia, serif']], K), () => openPart('webb'), 'Webb lectern');
   }
   // Across the way from the lectern, a small orrery of where the Webb works: L2, a million and a half
   // kilometres beyond the Earth, always behind it, circling a point it cannot stop at, its sunshield
   // turned to the Sun, the Earth and the Moon together. Drawn far closer than it is.
   const orrery = facing(new THREE.Group(), besideWebb(1).x, besideWebb(1).z, ARRIVAL.x, ARRIVAL.z);
+  orrery.scale.setScalar(1.3);   // larger than a table orrery, so its lettering reads from the way past it
   const l2 = {year: 0};
   {
     const turned = (profile, material) => { const m = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), 40), material); orrery.add(m); return m; };

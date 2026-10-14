@@ -170,7 +170,7 @@ export function createTwoJupiters(kit, {angle, nights, drawLens, credit}) {
   }
 
   // ── Galileo's view, in a gilt frame of his century ───────────────────
-  const SMALL = 1.5, galileoWall = along(-1.8, .06);
+  const SMALL = 1.5, galileoWall = along(-2.0, .06);
   moulding(galileoWall, SMALL / 2, [[0, .035], [0, .06], [.02, .075], [.035, .07], [.06, .1], [.1, .125], [.14, .112], [.165, .085], [.19, .07], [.205, .04], [.21, 0]], M.gold, Y);
   box(galileoWall, [SMALL + .02, SMALL + .02, .03], [0, Y, .015], M.darkWood);
   // Two sheets, so one evening can fade into the next.
@@ -180,10 +180,11 @@ export function createTwoJupiters(kit, {angle, nights, drawLens, credit}) {
   next.material.transparent = true; next.material.opacity = 0; next.visible = false;
   kit.moving(view, next);
   kit.press(view, () => open('pictures'), 'Galileo’s Jupiter');
-  plane(galileoWall, SMALL + .5, .42, [0, Y - SMALL / 2 - .45, .04], lettering(SMALL + .5, .42, [
-    ['JUPITER, AS GALILEO SAW IT', .12, .07, '#e1c393', '600 #px Arial, sans-serif'],
-    ['Evening by evening, January to March 1610', .23, .052, '#f1ddba', 'italic #px Georgia, serif'],
-    ['Positions: JPL Horizons (NASA)', .33, .048, '#c4b898', '#px Arial, sans-serif']]));
+  // Captions at about the eye, lettered to read from the middle of the bay.
+  plane(galileoWall, SMALL + .5, .6, [0, Y - SMALL / 2 - .55, .04], lettering(SMALL + .5, .6, [
+    ['JUPITER, AS GALILEO SAW IT', .16, .098, '#e1c393', '600 #px Arial, sans-serif'],
+    ['Evening by evening, January to March 1610', .32, .073, '#f1ddba', 'italic #px Georgia, serif'],
+    ['Positions: JPL Horizons (NASA)', .47, .062, '#c4b898', '#px Arial, sans-serif']]));
   pictureLight(galileoWall, SMALL + .42, Y + SMALL / 2 + .21);
   function paintView(sheet, index) {
     const ctx = sheet.canvas.getContext('2d'), night = nights()?.[index];
@@ -197,16 +198,16 @@ export function createTwoJupiters(kit, {angle, nights, drawLens, credit}) {
 
   // ── Webb's photograph, in a plain frame of ours ──────────────────────
   // 1646 by 1561 pixels.
-  const WIDE = 2.7, TALL = WIDE * 1561 / 1646, MAT = .14, webbWall = along(1.12, .06);
+  const WIDE = 2.7, TALL = WIDE * 1561 / 1646, MAT = .14, webbWall = along(1.4, .06);
   const placeholder = document.createElement('canvas'); placeholder.width = placeholder.height = 4;
   plane(webbWall, WIDE + 2 * MAT, TALL + 2 * MAT, [0, Y, .03], null).material = M.ivory;
   moulding(webbWall, (WIDE + 2 * MAT) / 2, [[0, .03], [0, .07], [.055, .07], [.055, 0]], M.ink, Y, (TALL + 2 * MAT) / (WIDE + 2 * MAT));
   const photo = plane(webbWall, WIDE, TALL, [0, Y, .034], texture(placeholder));
   kit.press(photo, () => open('pictures'), 'Webb’s Jupiter');
-  plane(webbWall, WIDE + .2, .42, [0, Y - TALL / 2 - MAT - .38, .04], lettering(WIDE + .2, .42, [
-    ['JUPITER, SEEN BY WEBB · 27 JULY 2022', .12, .07, '#e1c393', '600 #px Arial, sans-serif'],
-    ['Infrared: auroras over both poles, high hazes, the Great Red Spot', .22, .055, '#f1ddba', 'italic #px Georgia, serif'],
-    [credit, .33, .05, '#c4b898', '#px Arial, sans-serif']]));
+  plane(webbWall, WIDE + .2, .6, [0, Y - TALL / 2 - MAT - .45, .04], lettering(WIDE + .2, .6, [
+    ['JUPITER, SEEN BY WEBB · 27 JULY 2022', .16, .098, '#e1c393', '600 #px Arial, sans-serif'],
+    ['Infrared: auroras over both poles, high hazes, the Great Red Spot', .31, .074, '#f1ddba', 'italic #px Georgia, serif'],
+    [credit, .46, .058, '#c4b898', '#px Arial, sans-serif']]));
   pictureLight(webbWall, WIDE + .4, Y + TALL / 2 + MAT + .06);
 
   // ── The model: Jupiter and its four moons, on a turned table ─────────
@@ -272,7 +273,7 @@ export function createTwoJupiters(kit, {angle, nights, drawLens, credit}) {
   // Its plaque at the front right of the stage, as every bay's is.
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['TWO JUPITERS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Galileo, 1610 · Webb, 2022', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['The four moons Galileo found, moving as', .22, .033],

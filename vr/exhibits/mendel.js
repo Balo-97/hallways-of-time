@@ -160,12 +160,12 @@ export function createMendel(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.BoxGeometry(BENCH.w, 1.0, BENCH.d), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.y = BENCH.y + .45; bench.add(proxy);
   kit.press(proxy, () => open(), 'Mendel’s peas');
-  for (const x of [-.72, .72]) box(bench, [.04, .5, .04], [x, BENCH.y + .95, -BENCH.d / 2 - .02], M.darkWood);
-  kit.plane(bench, 1.4, .26, [0, BENCH.y + 1.15, -BENCH.d / 2], kit.lettering(1.4, .26, [
-    ['TALL × SHORT', .1, .07, '#e1c393', '600 #px Arial, sans-serif'], ['and then the grandchildren', .19, .05, '#f1ddba', 'italic #px Georgia, serif']], '#23303b'));
+  for (const x of [-1.02, 1.02]) box(bench, [.045, .62, .045], [x, BENCH.y + 1.01, -BENCH.d / 2 - .02], M.darkWood);
+  kit.plane(bench, 2.1, .4, [0, BENCH.y + 1.3, -BENCH.d / 2], kit.lettering(2.1, .4, [
+    ['TALL × SHORT', .15, .105, '#e1c393', '600 #px Arial, sans-serif'], ['and then the grandchildren', .29, .075, '#f1ddba', 'italic #px Georgia, serif']], '#23303b'));
   {
     const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
-    kit.plaque(p.x, p.z, 0, 0, [
+    kit.plaque(p.x, p.z, p.tx, p.tz, [
       ['MENDEL’S PEAS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Gregor Mendel, Brno, published 1866', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
       ['Cross a tall pea with a short one, then cross', .22, .033],
