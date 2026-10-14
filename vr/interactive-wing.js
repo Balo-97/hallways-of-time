@@ -1,7 +1,7 @@
 /**
  * Discovery Labs: a rotunda apart from the halls, reached by teleporting,
  * where a visitor does what the discoverers did. The Webb stands in the
- * middle; ten bays round the wall hold the exhibits, grouped by theme — the
+ * middle; eleven bays round the wall hold the exhibits, grouped by theme — the
  * sky, matter and the Earth, machines, life — and a plan at the way in takes
  * the visitor to any of them. The bays other than Galileo's and the two
  * Jupiters are modules of their own, in vr/exhibits/.
@@ -34,6 +34,7 @@ import {createMendel} from './exhibits/mendel.js';
 import {createTuringMachine} from './exhibits/turing-machine.js';
 import {createSuSongClock} from './exhibits/su-song-clock.js';
 import {createTwoJupiters} from './exhibits/two-jupiters.js';
+import {createBigBangEcho} from './exhibits/big-bang-echo.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
@@ -54,10 +55,10 @@ const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
 // through everything else in the labs, to look as close as they like.
 const ROPE = {along: 12.2, across: 8.7};
 /**
- * Ten bays thirty degrees apart round the wall, the way in at 0 and the labs'
- * name opposite it, behind the Webb. On the left, the sky and then matter and
- * the Earth; on the right, machines and then life; each group in the order of
- * its dates, front to back.
+ * Eleven bays thirty degrees apart round the wall, the way in at 0. On the
+ * left, the sky and then matter and the Earth; on the right, machines and then
+ * life; each group in the order of its dates, front to back. On the far wall,
+ * opposite the way in and seen past the Webb from it, the echo of the Big Bang.
  */
 const BAYS = [
   {id: 'galileo', angle: -30, group: 'sky', name: 'Galileo’s telescope', label: 'GALILEO · 1610'},
@@ -69,7 +70,8 @@ const BAYS = [
   {id: 'gutenberg', angle: 60, group: 'machines', name: 'The printing press', label: 'GUTENBERG · 1450'},
   {id: 'turing', angle: 90, group: 'machines', name: 'A Turing machine', label: 'TURING · 1936'},
   {id: 'mendel', angle: 120, group: 'life', name: 'Mendel’s peas', label: 'MENDEL · 1866'},
-  {id: 'dna', angle: 150, group: 'life', name: 'The double helix', label: 'THE DOUBLE HELIX · 1953'}
+  {id: 'dna', angle: 150, group: 'life', name: 'The double helix', label: 'THE DOUBLE HELIX · 1953'},
+  {id: 'cmb', angle: 180, group: 'sky', name: 'The echo of the Big Bang', label: 'PENZIAS AND WILSON · 1965'}
 ];
 // Where Jupiter is painted in Galileo's window, from the middle of its sill: the telescope points there.
 const JUPITER_IN_WINDOW = {x: .25, y: 3.0};
@@ -297,10 +299,10 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   band(R - .02, .05, 1.22, M.ivory); band(R - .02, .022, 1.32, M.gold);
   band(R - .12, .3, DRUM - .12, M.ivory); band(R - .18, .045, DRUM - .5, M.gold);
   // The frieze, under the cornice: over every bay the name of who stands in
-  // it, and the name of the labs over the door and opposite it.
+  // it, and the name of the labs over the door.
   const FRIEZE = {y: DRUM - 1.15, height: 1};
   {
-    const labels = [...BAYS.map(b => [b.angle, b.label]), [0, 'DISCOVERY LABS'], [180, 'DISCOVERY LABS']];
+    const labels = [...BAYS.map(b => [b.angle, b.label]), [0, 'DISCOVERY LABS']];
     // Six lengths of sixty degrees, each over two bays; a length is 29 m long and
     // a metre high, so 2,048 by 70 pixels keeps the letters square.
     for (let start = -165; start < 195; start += 60) {
@@ -763,7 +765,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     createPeriodicTable(kit, at('mendeleev')), createDoubleHelix(kit, at('dna')),
     createContinentalDrift(kit, at('wegener')), createMendel(kit, at('mendel')),
     createTuringMachine(kit, at('turing')), createSuSongClock(kit, at('susong')),
-    createTwoJupiters(kit, {...at('jupiters'), nights: () => state.nights, drawLens, credit: JUPITER_CREDIT})];
+    createTwoJupiters(kit, {...at('jupiters'), nights: () => state.nights, drawLens, credit: JUPITER_CREDIT}),
+    createBigBangEcho(kit, at('cmb'))];
   const exhibit = Object.fromEntries(exhibits.map(e => [e.id, e]));
 
   // ── The way in: a plan of the labs, and the way back ─────────────────
@@ -783,7 +786,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     ctx.fillStyle = '#172027'; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = 'rgba(201,166,100,.6)'; ctx.lineWidth = 3; ctx.strokeRect(10, 10, W - 20, H - 20);
     ctx.fillStyle = '#e1c393'; ctx.font = '600 58px Arial, sans-serif'; ctx.letterSpacing = '6px'; ctx.fillText('DISCOVERY LABS', 46, 92); ctx.letterSpacing = '0px';
-    ctx.fillStyle = '#c8b793'; ctx.font = 'italic 30px Georgia, serif'; ctx.fillText('Ten discoveries to try for yourself. Press one to go to it.', 48, 138, W - 90);
+    ctx.fillStyle = '#c8b793'; ctx.font = 'italic 30px Georgia, serif'; ctx.fillText('Eleven discoveries to try for yourself. Press one to go to it.', 48, 138, W - 90);
     // The plan, the way in at the foot, as the visitor stands to read it.
     const cx = 330, cy = 560, k = 250 / R;
     ctx.fillStyle = '#20302f'; ctx.beginPath(); ctx.arc(cx, cy, R * k, 0, Math.PI * 2); ctx.fill();

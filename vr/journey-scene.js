@@ -115,7 +115,7 @@ export function createJourneyScene(THREE,scene,callbacks){
     ctx.fillStyle='#e1c393';ctx.font='600 .062px Arial, sans-serif';ctx.fillText('DISCOVERY LABS',W/2,.12,W-.1);
     ctx.fillStyle='rgba(201,166,100,.55)';ctx.fillRect(.32,.19,W-.64,.004);
     ctx.fillStyle='#f1ddba';ctx.font='.054px Georgia, serif';
-    ['Ten discoveries to try for yourself,','round the Webb telescope at full size.'].forEach((line,i)=>ctx.fillText(line,W/2,.29+i*.095,W-.12));
+    ['Eleven discoveries to try for yourself,','round the Webb telescope at full size.'].forEach((line,i)=>ctx.fillText(line,W/2,.29+i*.095,W-.12));
     const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;
     plane(rake,W,H,0,.12,0,map);
     const go=plane(rake,1.2,.2,0,-.27,.002,texture('TELEPORT →',{...canvasFor(1.2,.2,.42),bg:'#4b5640'}));

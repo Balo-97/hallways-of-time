@@ -176,7 +176,7 @@ function collectionState(wi){return {page:pages[wi],pageCount:Math.ceil(records[
 function refreshExhibits(wi){journey.refresh(wi,selected(wi),collectionState(wi));updateUI();}
 function showGuide(){
   if(!renderer.xr.isPresenting){$('#guide').showModal();return;}
-  activeStory={id:'museum-guide',title:'Follow the thread of time.',date:'YOUR JOURNEY',detail:'Begin beside the cosmic expansion. Follow the single sequence of central plinths, from the earliest moments toward the present. Aim a controller at a plinth and press its trigger to read. Aim at the floor to teleport. Doors open when you approach them.',evidence:'Push the right thumbstick to walk. The left thumbstick turns the view in 30-degree steps, or smoothly if you choose that in the Guide. Hold Y on the left controller to rise and X to descend; teleporting to the floor brings you back down. The opening is an artistic visualization of expansion, and exhibit spacing is chronological rather than proportional. All 495 entries are included, in chapters of up to 12. Use NEXT CHAPTER at the desks at either end of a hall to continue in chronological order. The chapter signs show your progress. Doors lead directly to the next hall. Press B and choose Discovery Labs to teleport to a rotunda of ten discoveries to try, round the Webb telescope at full size, and the same row to come back.',facts:[['Comfort','Use the Guide on screen to select a still cosmic display.']]};storyPage=0;drawStory();
+  activeStory={id:'museum-guide',title:'Follow the thread of time.',date:'YOUR JOURNEY',detail:'Begin beside the cosmic expansion. Follow the single sequence of central plinths, from the earliest moments toward the present. Aim a controller at a plinth and press its trigger to read. Aim at the floor to teleport. Doors open when you approach them.',evidence:'Push the right thumbstick to walk. The left thumbstick turns the view in 30-degree steps, or smoothly if you choose that in the Guide. Hold Y on the left controller to rise and X to descend; teleporting to the floor brings you back down. The opening is an artistic visualization of expansion, and exhibit spacing is chronological rather than proportional. All 495 entries are included, in chapters of up to 12. Use NEXT CHAPTER at the desks at either end of a hall to continue in chronological order. The chapter signs show your progress. Doors lead directly to the next hall. Press B and choose Discovery Labs to teleport to a rotunda of eleven discoveries to try, round the Webb telescope at full size, and the same row to come back.',facts:[['Comfort','Use the Guide on screen to select a still cosmic display.']]};storyPage=0;drawStory();
 }
 function placeVisitor(x,z,yaw=0){
   rig.position.y=0;rig.rotation.y=yaw;camera.rotation.set(0,0,0);rig.updateMatrixWorld(true);getCamera().getWorldPosition(head);
@@ -257,7 +257,7 @@ function updateUI(){
   $('#interactive').setAttribute('aria-pressed',String(inWing));
   if(inWing){
     $('#wing-number').textContent='DISCOVERY LABS';$('#wing-title').textContent='Try it yourself';
-    $('#exhibit-count').textContent='Ten discoveries to try · the Webb telescope, full size';
+    $('#exhibit-count').textContent='Eleven discoveries to try · the Webb telescope, full size';
     $('#chapter-status').textContent='The plan at the way in takes you to any of them';
     $('.chapter-controls').hidden=true;$('#previous').hidden=true;$('#next').hidden=true;
     $('#next-hall').textContent=wingReturn?'Return to the museum ↩':'Go to the beginning ↩';
