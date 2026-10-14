@@ -23,6 +23,8 @@ import {TEXTURE_CAP, TEXTURE_SCALE} from './detail.js';
 import {loadGLB} from './glb.js';
 import {createSpeedOfLight} from './exhibits/speed-of-light.js';
 import {createPrintingPress} from './exhibits/printing-press.js';
+import {createPeriodicTable} from './exhibits/periodic-table.js';
+import {createDoubleHelix} from './exhibits/double-helix.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
@@ -41,7 +43,7 @@ const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
 // through everything else in the rotunda, to look as close as they like.
 const ROPE = {along: 15.2, across: 8.9};
 // Where things stand round the wall, in degrees from the way in.
-const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108};
+const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108, elements: -150, helix: 152};
 // Where Jupiter is painted in Galileo's window, from the middle of its sill: the telescope points there.
 const JUPITER_IN_WINDOW = {x: .25, y: 3.0};
 const MOON_ORBITS = [5.9, 9.4, 15, 26.4];   // mean distances, Jupiter radii
@@ -144,6 +146,52 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     return texture(canvas);
   }
   const press = (mesh, action, label) => { mesh.userData.action = action; mesh.userData.label = label; pickables.push(mesh); return mesh; };
+  const moving = [];
+  /** One geometry from many, each already placed: positions, normals and texture coordinates end to end. */
+  function mergeGeometries(list) {
+    let vertices = 0, count = 0;
+    for (const g of list) { vertices += g.attributes.position.count; count += g.index ? g.index.count : g.attributes.position.count; }
+    const position = new Float32Array(vertices * 3), normal = new Float32Array(vertices * 3), uv = new Float32Array(vertices * 2);
+    const index = new Uint32Array(count);
+    let v = 0, i = 0;
+    for (const g of list) {
+      const n = g.attributes.position.count;
+      position.set(g.attributes.position.array, v * 3); normal.set(g.attributes.normal.array, v * 3);
+      if (g.attributes.uv) uv.set(g.attributes.uv.array, v * 2);
+      if (g.index) for (const k of g.index.array) index[i++] = k + v; else for (let k = 0; k < n; k++) index[i++] = v + k;
+      v += n;
+    }
+    const merged = new THREE.BufferGeometry();
+    merged.setAttribute('position', new THREE.BufferAttribute(position, 3)); merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
+    merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); merged.setIndex(new THREE.BufferAttribute(index, 1));
+    merged.computeBoundingSphere();
+    return merged;
+  }
+  /**
+   * Merge everything under `root` that never moves into one mesh per material,
+   * as the halls do, so the rotunda and its exhibits, hundreds of parts, cost a
+   * few dozen draws. Parts under any of `keep`, which move, keep their own meshes,
+   * and so does anything that can be pressed.
+   */
+  function settle(root, keep) {
+    root.updateMatrixWorld(true);
+    const into = root.matrixWorld.clone().invert(), buckets = new Map();
+    root.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || !o.material.visible || pickables.includes(o)) return;
+      for (let p = o; p && p !== root; p = p.parent) if (keep.includes(p)) return;
+      if (!buckets.has(o.material)) buckets.set(o.material, []);
+      buckets.get(o.material).push(o);
+    });
+    for (const [material, meshes] of buckets) {
+      if (meshes.length < 2) continue;
+      const parts = meshes.map(m => m.geometry.clone().applyMatrix4(into.clone().multiply(m.matrixWorld)));
+      const merged = new THREE.Mesh(mergeGeometries(parts), material);
+      merged.name = `Interactive museum, merged: ${material.name || material.color?.getHexString?.() || 'part'}`;
+      root.add(merged);
+      for (const m of meshes) { m.removeFromParent(); m.geometry.dispose(); }
+      for (const g of parts) g.dispose();
+    }
+  }
   const invisible = new THREE.MeshBasicMaterial({visible: false});
   function seeded(seed) { return () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296); }
 
@@ -220,14 +268,14 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const FRIEZE = {y: DRUM - 1.15, height: 1};
   {
     // Each side names who stands beneath it, in the order a visitor facing it reads them.
-    const quarters = [[180, 'THE INTERACTIVE MUSEUM'], [-90, 'GALILEO · PADUA 1610   ✦   RØMER · PARIS 1676'],
+    const quarters = [[180, 'MENDELEEV · 1869   ✦   THE INTERACTIVE MUSEUM   ✦   THE DOUBLE HELIX · 1953'], [-90, 'GALILEO · PADUA 1610   ✦   RØMER · PARIS 1676'],
       [90, 'GUTENBERG · MAINZ 1450   ✦   WEBB · 2021'], [0, 'LOOK WHERE THEY LOOKED   ✦   DO WHAT THEY DID']];
     // A quarter of the frieze is 34.5 m long and a metre high: 2,048 by 60 pixels keeps the letters square.
     for (const [angle, words] of quarters) {
       const c = document.createElement('canvas'); c.width = 2048; c.height = 60; const ctx = c.getContext('2d');
       ctx.fillStyle = '#23303b'; ctx.fillRect(0, 0, 2048, 60);
       ctx.fillStyle = '#e1c393'; ctx.font = '600 32px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.letterSpacing = '9px'; ctx.fillText(words, 1024, 31);
+      ctx.letterSpacing = '9px'; ctx.fillText(words, 1024, 31, 1960);
       const half = ctx.measureText(words).width / 2;
       ctx.letterSpacing = '0px'; ctx.font = '22px Arial, sans-serif';
       for (let x = 1024 - half - 60; x > 30; x -= 150) ctx.fillText('✦', x, 31);
@@ -243,7 +291,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // Ivory pilasters every fifteen degrees, except where the door, the window and
   // the pictures are, standing up to the frieze rather than across it.
   {
-    const kept = [[PLACES.door, 6.5], [PLACES.galileo, 5.5], [PLACES.galileoView, 3.5], [PLACES.webbView, 4.5], [PLACES.press, 5]];
+    const kept = [[PLACES.door, 6.5], [PLACES.galileo, 5.5], [PLACES.galileoView, 3.5], [PLACES.webbView, 4.5], [PLACES.press, 5], [PLACES.elements, 6.5]];
     const angles = [];
     for (let a = -172.5; a < 180; a += 15) if (!kept.some(([at, half]) => Math.abs(((a - at + 540) % 360) - 180) < half + 2.5)) angles.push(a);
     const top = FRIEZE.y - FRIEZE.height / 2 - .2, shaft = top - .3 - .34;
@@ -459,6 +507,10 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     THREE, M, deg, radius: R, box, plane, lettering, canvasFor, texture, seeded, wrapped, board,
     onWall, inRoom, facing, press,
     medallion: (x, z) => medallions.push([x, z]),
+    /** Parts that move, and so keep meshes of their own when the room's still parts are merged. */
+    moving: (...parts) => moving.push(...parts),
+    /** Merge a moving part's own pieces, in its own frame, leaving out the parts within it that move on their own. */
+    settle: (root, keep = []) => settle(root, keep),
     /** A panel of the exhibit's own: `paint` answers its canvas, `actions` its buttons, `zones` places on it to press. */
     panel: (kind, spec) => { panelSpecs[kind] = spec; },
     open: kind => open(kind), redraw: () => { if (panel) drawPanel(); }, close: () => closePanel(), showing: () => state.panelKind,
@@ -475,7 +527,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       return plate;
     }
   };
-  const exhibits = [createSpeedOfLight(kit, {angle: PLACES.romer}), createPrintingPress(kit, {angle: PLACES.press})];
+  const exhibits = [createSpeedOfLight(kit, {angle: PLACES.romer}), createPrintingPress(kit, {angle: PLACES.press}),
+    createPeriodicTable(kit, {angle: PLACES.elements}), createDoubleHelix(kit, {angle: PLACES.helix})];
   const exhibit = Object.fromEntries(exhibits.map(e => [e.id, e]));
 
   // The medallions, one draw for each of their three parts.
@@ -495,6 +548,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     });
     group.add(petals);
   }
+  settle(group, moving);
 
   // ── Loading what comes from files ────────────────────────────────────
   let environment = null;

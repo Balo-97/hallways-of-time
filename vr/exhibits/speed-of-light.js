@@ -56,7 +56,7 @@ export function createSpeedOfLight(kit, {angle}) {
   const face = new THREE.Mesh(new THREE.CircleGeometry(1.4, 96), new THREE.MeshStandardMaterial({map: kit.texture(enamel), roughness: .4, metalness: .1}));
   face.rotation.x = -Math.PI / 2; face.position.y = .852; table.add(face);
   // The orrery: in the table's plane, ecliptic x to the right and ecliptic y away from the visitor.
-  const orrery = new THREE.Group(); orrery.position.y = .92; table.add(orrery);
+  const orrery = new THREE.Group(); orrery.position.y = .92; table.add(orrery); kit.moving(orrery);
   const place = (x, y) => new THREE.Vector3(x * SCALE, 0, -y * SCALE);
   const glow = (color, r) => new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12), new THREE.MeshBasicMaterial({color}));
   const sun = glow('#ffd47a', .055); orrery.add(sun);

@@ -158,6 +158,8 @@ export function createPrintingPress(kit, {angle}) {
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(.018, .02, .2, 10), oak); grip.position.y = .17; ball.add(grip);
     return {ball, home: ball.position.clone()};
   });
+  // What moves in a pull keeps meshes of its own; the rest of the press is merged.
+  kit.moving(bar, screw, hose, carriage, tympan, frisket, rounce, ...balls.map(b => b.ball));
   // The type cases on their frame: capitals in the upper case, small letters in the lower.
   const frame = new THREE.Group(); frame.position.set(1.42, 0, .5); frame.rotation.y = -.35; press.add(frame);
   for (const x of [-.45, .45]) { box(frame, [.07, 1.25, .07], [x, .62, -.15], oak); box(frame, [.07, .9, .07], [x, .45, .2], oak); }
@@ -215,6 +217,10 @@ export function createPrintingPress(kit, {angle}) {
       ['in type, ink it, and pull the bar.', .37, .033],
       ['Every page you print hangs on the line to dry.', .45, .028, '#a99a7c', 'italic #px Georgia, serif']], () => open(), 'Gutenberg plaque');
   }
+
+  // Each moving part merged within itself: the bed's timbers, the tympan's frame, the frisket's, and so on.
+  for (const part of [screw, hose, rounce, frisket, ...balls.map(b => b.ball)]) kit.settle(part);
+  kit.settle(tympan, [frisket]); kit.settle(carriage, [tympan]);
 
   // ── The printed page ─────────────────────────────────────────────────
   /** A page as it comes off the press: the name in black, its initial painted in red. */
