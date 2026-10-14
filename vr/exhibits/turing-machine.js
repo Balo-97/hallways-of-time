@@ -37,7 +37,7 @@ export function createTuringMachine(kit, {angle}) {
   const state = {program: 0, tape: new Map(), head: 0, machine: 'A', steps: 0, halted: false, running: false, t: -1, pending: null, page: 'machine', wait: 0};
 
   // ── The desk, the tape, the head and the rule card ───────────────────
-  const wall = kit.onWall(angle, 4.0);
+  const wall = kit.onWall(angle, kit.STAGE);
   const desk = new THREE.Group(); wall.add(desk);
   const TOP = .84;
   box(desk, [3.5, .06, .74], [0, TOP, 0], M.darkWood);
@@ -127,9 +127,8 @@ export function createTuringMachine(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.7, .8), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.y = 1.1; desk.add(proxy);
   kit.press(proxy, () => open(), 'Turing machine');
-  const front = kit.inRoom(wall, 0, 1.8); kit.medallion(front.x, front.z);
   {
-    const p = kit.inRoom(wall, 2.4, 1.6);
+    const p = kit.inRoom(wall, 2.5, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['ON COMPUTABLE NUMBERS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Alan Turing, Cambridge, 1936', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

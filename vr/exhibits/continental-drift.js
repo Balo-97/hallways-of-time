@@ -40,7 +40,7 @@ export function createContinentalDrift(kit, {angle}) {
   const axis = at(FIT.lat, FIT.lon);
 
   // ── The globe ────────────────────────────────────────────────────────
-  const wall = kit.onWall(angle, 4.6);
+  const wall = kit.onWall(angle, kit.STAGE);
   const stand = new THREE.Group(); stand.position.x = -1.3; wall.add(stand);
   box(stand, [.8, .1, .8], [0, .05, 0], M.slate);
   const column = new THREE.Mesh(new THREE.CylinderGeometry(.07, .1, .75, 16), M.brass); column.position.y = .45; stand.add(column);
@@ -136,9 +136,8 @@ export function createContinentalDrift(kit, {angle}) {
   for (let offset = HALF - STRIPE; offset >= 0; offset -= STRIPE) state.stripes.push({offset, polarity: Math.sin(offset * 9.7) + Math.sin(offset * 23) > 0 ? 1 : -1});
   placeStripes();
 
-  const centre = kit.inRoom(wall, 0, 0); kit.medallion(centre.x, centre.z);
   {
-    const p = kit.inRoom(wall, 0, 2.2);
+    const p = kit.inRoom(wall, 3.3, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['CONTINENTAL DRIFT', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Wegener, 1912 · the seafloor, 1960s', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

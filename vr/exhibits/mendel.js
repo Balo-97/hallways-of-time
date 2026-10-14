@@ -26,7 +26,7 @@ export function createMendel(kit, {angle}) {
   const child = (a, b) => (a[Math.random() < .5 ? 0 : 1] + b[Math.random() < .5 ? 0 : 1]).split('').sort().join('');   // 'T' sorts before 't'
 
   // ── The potting bench and its pots ───────────────────────────────────
-  const wall = kit.onWall(angle, 4.3);
+  const wall = kit.onWall(angle, kit.STAGE);
   const bench = new THREE.Group(); wall.add(bench);
   const BENCH = {w: 2.3, d: 1.05, y: .78};
   box(bench, [BENCH.w, .07, BENCH.d], [0, BENCH.y, 0], M.wood);
@@ -71,9 +71,8 @@ export function createMendel(kit, {angle}) {
   // Above the tallest plants, so they never hide it.
   kit.plane(bench, 1.4, .26, [0, BENCH.y + 1.15, -BENCH.d / 2 - .02], kit.lettering(1.4, .26, [
     ['TALL × SHORT', .1, .07, '#e1c393', '600 #px Arial, sans-serif'], ['and then the grandchildren', .19, .05, '#f1ddba', 'italic #px Georgia, serif']], '#23303b'));
-  const front = kit.inRoom(wall, 0, 0); kit.medallion(front.x, front.z);
   {
-    const p = kit.inRoom(wall, -1.9, 1.7);
+    const p = kit.inRoom(wall, 2.0, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['MENDEL’S PEAS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Gregor Mendel, Brno, published 1866', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

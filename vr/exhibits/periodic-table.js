@@ -168,7 +168,7 @@ export function createPeriodicTable(kit, {angle}) {
     open();
   }, 'The periodic table');
   {
-    const p = kit.inRoom(wall, -W / 2 - .9, 2.4);
+    const p = kit.inRoom(wall, W / 2 + .9, kit.STAGE - .26 + 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE PERIODIC TABLE', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Mendeleev, St Petersburg, 1869', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
@@ -178,7 +178,6 @@ export function createPeriodicTable(kit, {angle}) {
       ['After Jennifer Johnson’s chart of the origin of', .41, .026, '#a99a7c', 'italic #px Georgia, serif'],
       ['the elements (2019), in outline; some still argued.', .45, .026, '#a99a7c', 'italic #px Georgia, serif']], () => open(), 'Periodic table plaque');
   }
-  const front = kit.inRoom(wall, 0, 2.6); kit.medallion(front.x, front.z);
 
   // ── The panel: an element's card above, the whole table below ───────
   const MINI = {x: 66, y: 420, cell: 56};

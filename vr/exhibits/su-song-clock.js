@@ -28,7 +28,7 @@ export function createSuSongClock(kit, {angle}) {
   const state = {water: true, escapement: true, fill: 0, stepping: -1, rotation: 0, ticks: 0, hours: 0, jack: -1, page: 'escapement', fills: new Array(BUCKETS).fill(0), free: 0};
 
   // ── The tower ────────────────────────────────────────────────────────
-  const wall = kit.onWall(angle, 4.6);
+  const wall = kit.onWall(angle, kit.STAGE);
   const tower = new THREE.Group(); wall.add(tower);
   box(tower, [2.7, .16, 2.0], [0, .08, 0], M.ivory);
   box(tower, [2.8, .03, 2.1], [0, .175, 0], M.gold);
@@ -145,9 +145,8 @@ export function createSuSongClock(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.6, 1.6), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.y = 1.8; tower.add(proxy);
   kit.press(proxy, () => open(), 'Su Song’s clock tower');
-  const front = kit.inRoom(wall, 0, 1.9); kit.medallion(front.x, front.z);
   {
-    const p = kit.inRoom(wall, -2.3, 1.6);
+    const p = kit.inRoom(wall, 2.3, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['SU SONG’S CLOCK TOWER', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Kaifeng, 1092 · a model, much smaller', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

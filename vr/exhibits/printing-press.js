@@ -63,7 +63,7 @@ export function createPrintingPress(kit, {angle}) {
 
   // ── The press ────────────────────────────────────────────────────────
   // In its wall frame: x along the wall, z out toward the room, the press's front.
-  const wall = kit.onWall(angle, 3.6);
+  const wall = kit.onWall(angle, kit.STAGE);
   const press = new THREE.Group(); wall.add(press);
   for (const side of [-1, 1]) {
     box(press, [.17, 2.1, .3], [side * .62, 1.05, 0], oak);                  // the cheeks
@@ -205,9 +205,8 @@ export function createPrintingPress(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.2, 1.0), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.set(0, 1.1, .1); press.add(proxy);
   kit.press(proxy, () => open(), 'Printing press');
-  const front = kit.inRoom(wall, 0, 2.7); kit.medallion(front.x, front.z);
   {
-    const p = kit.inRoom(wall, -2.3, 1.9);
+    const p = kit.inRoom(wall, 3.0, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE PRINTING PRESS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Johannes Gutenberg, Mainz, about 1450', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
@@ -245,7 +244,7 @@ export function createPrintingPress(kit, {angle}) {
     ctx.fillStyle = '#1d1a17'; ctx.font = 'italic 22px Georgia'; ctx.textAlign = 'center';
     ctx.fillText('Set by hand in movable type', 256, 430);
     ctx.fillText('and pulled on a wooden press', 256, 460);
-    ctx.font = '16px Georgia'; ctx.fillText('THE INTERACTIVE MUSEUM · HALLWAYS OF TIME', 256, 600);
+    ctx.font = '16px Georgia'; ctx.fillText('DISCOVERY LABS · HALLWAYS OF TIME', 256, 600);
     return c;
   }
   /** A page pegged to the line: it slides into the first slot, and the others move along. */

@@ -32,7 +32,7 @@ export function createDoubleHelix(kit, {angle}) {
   const state = {paired: 0, popped: new Array(N).fill(-1), mode: 'build', copy: -1, spin: 0, feedback: null};
 
   // ── The plinth and the model ─────────────────────────────────────────
-  const wall = kit.onWall(angle, 4.6);
+  const wall = kit.onWall(angle, kit.STAGE);
   const plinth = new THREE.Group(); wall.add(plinth);
   box(plinth, [1.1, .08, 1.1], [0, .04, 0], M.slate);
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(.72, .78, .42, 48), M.ivory); drum.position.y = .29; plinth.add(drum);
@@ -102,9 +102,8 @@ export function createDoubleHelix(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.CylinderGeometry(.6, .6, 2.3, 16), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.y = 1.25; plinth.add(proxy);
   kit.press(proxy, () => open(), 'The double helix');
-  const centre = kit.inRoom(wall, 0, 0); kit.medallion(centre.x, centre.z);
   {
-    const p = kit.inRoom(wall, 1.8, 1.7);
+    const p = kit.inRoom(wall, 1.9, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE DOUBLE HELIX', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Cambridge and London, 1953', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

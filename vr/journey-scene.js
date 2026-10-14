@@ -104,7 +104,7 @@ export function createJourneyScene(THREE,scene,callbacks){
   // Its pair on the other side of the control desk: the way to the interactive
   // museum. The native museum has no such gallery yet, so it leaves this out.
   if(callbacks.interactive){
-    const desk=new THREE.Group();desk.name='Interactive museum desk';desk.userData.nativeSkip=true;
+    const desk=new THREE.Group();desk.name='Discovery Labs desk';desk.userData.nativeSkip=true;
     desk.position.set(-3.2,0,9.1);desk.rotation.y=Math.PI-Math.atan2(3.2,5.1);scene.add(desk);
     B(desk,1.5,1.0,.46,0,.5,0,dark);B(desk,1.58,.045,.54,0,1.02,0,gold);
     const rake=new THREE.Group();rake.position.set(0,1.34,.04);rake.rotation.x=-.52;desk.add(rake);
@@ -112,10 +112,10 @@ export function createJourneyScene(THREE,scene,callbacks){
     const W=1.44,H=.56,{w,h}=canvasFor(W,H,.1),c=document.createElement('canvas');c.width=w;c.height=h;
     const ctx=c.getContext('2d');ctx.scale(w/W,h/H);
     ctx.fillStyle='#172027';ctx.fillRect(0,0,W,H);ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle='#e1c393';ctx.font='600 .062px Arial, sans-serif';ctx.fillText('THE INTERACTIVE MUSEUM',W/2,.12,W-.1);
+    ctx.fillStyle='#e1c393';ctx.font='600 .062px Arial, sans-serif';ctx.fillText('DISCOVERY LABS',W/2,.12,W-.1);
     ctx.fillStyle='rgba(201,166,100,.55)';ctx.fillRect(.32,.19,W-.64,.004);
     ctx.fillStyle='#f1ddba';ctx.font='.054px Georgia, serif';
-    ['Look through Galileo’s telescope at Jupiter,','and stand beneath the Webb telescope.'].forEach((line,i)=>ctx.fillText(line,W/2,.29+i*.095,W-.12));
+    ['Ten discoveries to try for yourself,','round the Webb telescope at full size.'].forEach((line,i)=>ctx.fillText(line,W/2,.29+i*.095,W-.12));
     const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;
     plane(rake,W,H,0,.12,0,map);
     const go=plane(rake,1.2,.2,0,-.27,.002,texture('TELEPORT →',{...canvasFor(1.2,.2,.42),bg:'#4b5640'}));

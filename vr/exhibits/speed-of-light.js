@@ -46,7 +46,7 @@ export function createSpeedOfLight(kit, {angle}) {
   const minutes = m => { const whole = Math.floor(m), s = Math.round((m - whole) * 60); return `${whole} min ${s} s`; };
 
   // ── The table and its orrery ─────────────────────────────────────────
-  const wall = kit.onWall(angle, 4.3);
+  const wall = kit.onWall(angle, kit.STAGE);
   const table = new THREE.Group(); wall.add(table);
   box(table, [.9, .78, .9], [0, .39, 0], M.slate);
   const top = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, .07, 96), M.ivory); top.position.y = .815; table.add(top);
@@ -97,10 +97,8 @@ export function createSpeedOfLight(kit, {angle}) {
   const proxy = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, .5, 24), new THREE.MeshBasicMaterial({visible: false}));
   proxy.position.y = 1.05; table.add(proxy);
   kit.press(proxy, () => open(), 'Rømer’s orrery');
-  const centre = kit.inRoom(wall, 0, 0);
-  kit.medallion(centre.x, centre.z);
   {
-    const p = kit.inRoom(wall, 2.1, 1.9);
+    const p = kit.inRoom(wall, 2.5, 1.5);
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE SPEED OF LIGHT', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Ole Rømer, Paris, 1676', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
