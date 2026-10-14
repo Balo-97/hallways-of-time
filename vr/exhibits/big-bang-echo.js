@@ -156,7 +156,7 @@ export function createBigBangEcho(kit, {angle}) {
   for (const b of birds) kit.settle(b.bird, [b.head, ...b.wings.map(w => w.hinge)]);
 
   // ── The receiver and its chart ───────────────────────────────────────
-  const rack = new THREE.Group(); rack.position.set(2.75, 0, .55); rack.rotation.y = -.5; stage.add(rack);
+  const rack = new THREE.Group(); rack.position.set(2.45, 0, .1); rack.rotation.y = -.5; stage.add(rack);
   const grey60s = new THREE.MeshStandardMaterial({color: '#8e9692', roughness: .5});
   box(rack, [.7, 1.2, .5], [0, .6, 0], grey60s);
   box(rack, [.72, .03, .52], [0, 1.215, 0], M.ink);
@@ -191,7 +191,7 @@ export function createBigBangEcho(kit, {angle}) {
   skyProxy.position.set(0, MAP.y, .05); wall.add(skyProxy);
   kit.press(skyProxy, () => open('light'), 'The oldest light');
   {
-    const p = kit.inRoom(stage, 3.3, 1.9);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE ECHO OF THE BIG BANG', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Penzias and Wilson, Holmdel, 1965', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

@@ -46,7 +46,8 @@ export const WING_Z = 400;
 const ROOM = {radius: 28, drum: 12, dome: 12};
 /** How far in from the wall every bay's exhibit stands. */
 const STAGE = 5;
-const ARRIVAL = {x: 0, z: ROOM.radius - 3.5, yaw: 0};
+/** Where a visitor arrives: on the ring of the bays' medallions, as if the way in were a bay of its own. */
+const ARRIVAL = {x: 0, z: ROOM.radius - STAGE, yaw: 0};
 // NASA's model looks along its +x; turned a quarter, its mirror faces the way in.
 const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
 // A gilt ellipse on the floor marks the Webb's ground: all of the telescope
@@ -62,8 +63,8 @@ const ROPE = {along: 12.2, across: 8.7};
  */
 const BAYS = [
   {id: 'galileo', angle: -30, group: 'sky', name: 'Galileo’s telescope', label: 'GALILEO · 1610'},
-  {id: 'romer', angle: -60, group: 'sky', name: 'The speed of light', label: 'RØMER · 1676'},
-  {id: 'jupiters', angle: -90, group: 'sky', name: 'Two Jupiters', label: 'TWO JUPITERS · 1610 AND 2022'},
+  {id: 'jupiters', angle: -60, group: 'sky', name: 'Two Jupiters', label: 'TWO JUPITERS · 1610 AND 2022'},
+  {id: 'romer', angle: -90, group: 'sky', name: 'The speed of light', label: 'RØMER · 1676'},
   {id: 'mendeleev', angle: -120, group: 'matter', name: 'The periodic table', label: 'MENDELEEV · 1869'},
   {id: 'wegener', angle: -150, group: 'matter', name: 'Continental drift', label: 'WEGENER · 1912'},
   {id: 'susong', angle: 30, group: 'machines', name: 'Su Song’s clock tower', label: 'SU SONG · 1092'},
@@ -153,8 +154,10 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(...size), material); m.position.set(...position); parent.add(m); return m;
   };
   const SIGN_PX = Math.round(680 * TEXTURE_SCALE);
-  function canvasFor(width, height) {
-    const px = Math.min(SIGN_PX, TEXTURE_CAP / Math.max(width, height));
+  // Plaques are read from arm's length, where a Quest 3 resolves some 950 pixels a metre.
+  const PLAQUE_PX = Math.round(960 * TEXTURE_SCALE);
+  function canvasFor(width, height, density = SIGN_PX) {
+    const px = Math.min(density, TEXTURE_CAP / Math.max(width, height));
     const c = document.createElement('canvas'); c.width = Math.round(width * px); c.height = Math.round(height * px);
     const ctx = c.getContext('2d'); ctx.scale(c.width / width, c.height / height);   // drawn in metres
     return {canvas: c, ctx};
@@ -165,8 +168,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     m.position.set(...position); m.rotation.y = rotationY; parent.add(m); return m;
   }
   /** A plate of lettering, `lines` as [text, size, colour, font] in metres. */
-  function lettering(width, height, lines, background = '#172027') {
-    const {canvas, ctx} = canvasFor(width, height);
+  function lettering(width, height, lines, background = '#172027', density) {
+    const {canvas, ctx} = canvasFor(width, height, density);
     ctx.fillStyle = background; ctx.fillRect(0, 0, width, height);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const [text, y, size, color = '#f1ddba', font = '#px Georgia, serif'] of lines) {
@@ -246,21 +249,58 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   }
   /** The angle on the wall `x` metres to the right of `angle`, for a visitor facing it. */
   const beside = (angle, x) => angle - x / R / deg;
+  /**
+   * Where every bay's plaque stands: at its front right, seven and a half degrees
+   * round from the bay's middle and 22 metres from the centre — the middle of a
+   * square of the floor — so the plaques make one even ring round the room.
+   */
+  const plaqueAt = angle => { const a = (angle - 7.5) * deg; return {x: Math.sin(a) * 22, z: Math.cos(a) * 22}; };
   /** Where a visitor stands to see the exhibit in a bay, and which way they face: toward it. */
   const standAt = angle => { const a = angle * deg, r = R - STAGE - 3.4; return {x: Math.sin(a) * r, z: Math.cos(a) * r, yaw: a + Math.PI}; };
   const bayOf = id => BAYS.find(b => b.id === id);
 
-  // The floor is the halls' own: the same marble squares and inlaid diamonds,
-  // the same polish, laid square to the room metre for metre as theirs are.
-  // Their floor spreads its pattern over 18 by 242 metres, so these UVs do too.
+  /**
+   * The floor is the halls' own marble — the same squares two metres across,
+   * the same alternating cream, the same inlaid diamonds, the very same
+   * material — but laid as a round room's floor is laid: in rings two metres
+   * deep, cut by joints that run straight to the centre. Every bay, the way in
+   * and every pilaster stands on a joint, so the room is square to its floor
+   * wherever one looks. As the rings widen, each is cut into more squares to
+   * keep them square — 8, then 24, 48 and 72 round — and a band of blue
+   * stone covers the seam wherever the count changes.
+   */
+  const FLOOR_ZONES = [[0, 3, 8], [3, 9, 24], [9, 17, 48], [17, R - 1.25, 72]];
+  const SEAMS = [3, 9, 17];
   {
-    const geometry = new THREE.CircleGeometry(R, 160), p = geometry.attributes.position, uv = geometry.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 18 + .5, p.getY(i) / 242 + .5);
+    // The halls' texture holds four squares a side and is repeated by the material, so the
+    // coordinates are given in squares and divided by that repeat.
+    const repeat = M.floor.map?.repeat || new THREE.Vector2(1, 1), steps = 192, positions = [], uvs = [], index = [];
+    for (const [r0, r1, around] of FLOOR_ZONES) {
+      const base = positions.length / 3;
+      for (let i = 0; i <= steps; i++) {
+        const a = i / steps * Math.PI * 2;
+        for (const r of [r0, r1]) {
+          positions.push(Math.sin(a) * r, 0, Math.cos(a) * r);
+          uvs.push(a / (Math.PI * 2) * around / 4 / repeat.x, (r - 3) / 8 / repeat.y);
+        }
+        if (i < steps) { const k = base + i * 2; index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(index); geometry.computeVertexNormals();
+    if (geometry.attributes.normal.getY(0) < 0) { geometry.setIndex(index.map((v, i) => index[i - i % 3 + 2 - i % 3])); geometry.computeVertexNormals(); }
     const floor = new THREE.Mesh(geometry, M.floor);
-    floor.rotation.x = -Math.PI / 2; floor.name = 'Interactive museum floor';
+    floor.name = 'Interactive museum floor';
     floor.userData.floor = true; group.add(floor); pickables.push(floor);
   }
   const flat = (geometry, material, y) => { const m = new THREE.Mesh(geometry, material); m.rotation.x = -Math.PI / 2; m.position.y = y; group.add(m); return m; };
+  // The seams where the count of squares changes, each under a band of blue stone edged in gilt.
+  for (const r of SEAMS) {
+    flat(new THREE.RingGeometry(r - .13, r + .13, 192, 1), M.stone, .006);
+    for (const edge of [r - .15, r + .15]) flat(new THREE.RingGeometry(edge - .018, edge + .018, 192, 1), M.gold, .008);
+  }
   // A border of blue stone, edged in gilt, round the foot of the wall.
   flat(new THREE.RingGeometry(R - 1.3, R, 160, 1), M.stone, .008);
   flat(new THREE.RingGeometry(R - 1.44, R - 1.36, 160, 1), M.gold, .01);
@@ -284,9 +324,10 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     rope.position.set(WEBB.x, .012, WEBB.z); group.add(rope);
   }
   // The halls' floor medallions — two gilt rings and eight petals of stone —
-  // where a visitor arrives, and under the stage of every bay, all on one ring.
+  // at the centre, where a visitor arrives, and under the stage of every bay, all
+  // on one ring and each on a crossing of the floor's joints.
   // Galileo's bay has its rug instead.
-  const medallions = [[ARRIVAL.x, ARRIVAL.z], ...BAYS.filter(b => b.id !== 'galileo').map(b => [Math.sin(b.angle * deg) * (R - STAGE), Math.cos(b.angle * deg) * (R - STAGE)])];
+  const medallions = [[0, 0], [ARRIVAL.x, ARRIVAL.z], ...BAYS.filter(b => b.id !== 'galileo').map(b => [Math.sin(b.angle * deg) * (R - STAGE), Math.cos(b.angle * deg) * (R - STAGE)])];
   // The wall: a drum of plaster with a marble skirting, a dado rail and a cornice.
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, DRUM, 192, 1, true), M.plaster);
   drum.material = M.plaster.clone(); drum.material.side = THREE.BackSide;
@@ -303,27 +344,35 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const FRIEZE = {y: DRUM - 1.15, height: 1};
   {
     const labels = [...BAYS.map(b => [b.angle, b.label]), [0, 'DISCOVERY LABS']];
-    // Six lengths of sixty degrees, each over two bays; a length is 29 m long and
-    // a metre high, so 2,048 by 70 pixels keeps the letters square.
-    for (let start = -165; start < 195; start += 60) {
-      const c = document.createElement('canvas'); c.width = 2048; c.height = 70; const ctx = c.getContext('2d');
-      ctx.fillStyle = '#23303b'; ctx.fillRect(0, 0, 2048, 70);
-      ctx.fillStyle = '#e1c393'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      // The texture runs from the higher angle on the left, as a visitor facing the wall reads it.
-      const x = angle => (start + 60 - angle) / 60 * 2048;
+    // Twelve lengths of thirty degrees, one over each bay and the way in. A length is
+    // 14.7 m long and a metre high, so a row of 2,048 by 140 pixels keeps its letters
+    // square and sharp from the floor eleven metres below; the twelve rows share one
+    // sheet, and the twelve lengths one mesh, so the whole frieze is a single draw.
+    const ROW = 140, sheet = document.createElement('canvas'); sheet.width = 2048; sheet.height = ROW * 12;
+    const ctx = sheet.getContext('2d'), lengths = [];
+    ctx.fillStyle = '#23303b'; ctx.fillRect(0, 0, 2048, sheet.height);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let row = 0; row < 12; row++) {
+      const start = -195 + row * 30, y = row * ROW + ROW / 2;
+      // Each row runs from the higher angle on the left, as a visitor facing the wall reads it.
+      const x = angle => (start + 30 - angle) / 30 * 2048;
+      ctx.fillStyle = '#e1c393';
       for (const [angle, words] of labels) {
         const at = ((angle - start) % 360 + 360) % 360;
-        if (at >= 60) continue;
-        ctx.font = '600 38px Arial, sans-serif'; ctx.letterSpacing = '10px'; ctx.fillText(words, x(start + at), 36, 960);
+        if (at >= 30) continue;
+        ctx.font = '600 76px Arial, sans-serif'; ctx.letterSpacing = '20px'; ctx.fillText(words, x(start + at), y + 2, 1880);
       }
-      // A star between bays; those at the ends of a length are halves, completed by its neighbour.
-      ctx.letterSpacing = '0px'; ctx.font = '26px Arial, sans-serif';
-      for (const between of [0, 1024, 2048]) ctx.fillText('✦', between, 36);
-      const map = texture(c); map.wrapS = THREE.RepeatWrapping; map.repeat.set(-1, 1);   // read from inside the drum
-      const length = new THREE.CylinderGeometry(R - .07, R - .07, FRIEZE.height, 64, 1, true, start * deg, 60 * deg);
-      const frieze = new THREE.Mesh(length, new THREE.MeshBasicMaterial({map, side: THREE.BackSide}));
-      frieze.position.y = FRIEZE.y; group.add(frieze);
+      // A star between bays, in halves at the ends of each length, completed by its neighbour.
+      ctx.letterSpacing = '0px'; ctx.font = '52px Arial, sans-serif';
+      for (const between of [0, 2048]) ctx.fillText('✦', between, y + 2);
+      // The length's own place on the sheet: its row, and read from inside the drum, so turned about.
+      const length = new THREE.CylinderGeometry(R - .07, R - .07, FRIEZE.height, 32, 1, true, start * deg, 30 * deg), uv = length.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, 1 - uv.getX(i), 1 - (row * ROW + (1 - uv.getY(i)) * ROW) / sheet.height);
+      length.translate(0, FRIEZE.y, 0); lengths.push(length);
     }
+    const frieze = new THREE.Mesh(mergeGeometries(lengths), new THREE.MeshBasicMaterial({map: texture(sheet), side: THREE.BackSide}));
+    frieze.name = 'Frieze'; group.add(frieze);
+    for (const g of lengths) g.dispose();
     // Gilt above and below it.
     band(R - .1, .05, FRIEZE.y - FRIEZE.height / 2 - .08, M.gold);
   }
@@ -510,13 +559,13 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     box(stand, [.9, .95, .36], [0, .475, 0], M.slate); box(stand, [.98, .04, .44], [0, .97, 0], M.gold);
     const rake = new THREE.Group(); rake.position.set(0, 1.22, .03); rake.rotation.x = -.55; stand.add(rake);
     box(rake, [.94, .58, .03], [0, 0, -.02], M.gold);
-    const plate = plane(rake, .9, .54, [0, 0, .001], lettering(.9, .54, lines));
+    const plate = plane(rake, .9, .54, [0, 0, .001], lettering(.9, .54, lines, undefined, PLAQUE_PX));
     press(plate, action, label);
     return plate;
   }
   // Its plaque at the front right of the stage, as every bay's is.
   {
-    const at = inRoom(galileoWall, 2.1, GALILEO_STAGE + 1.5);
+    const at = plaqueAt(bayOf('galileo').angle);
     plaque(at.x, at.z, 0, 0, [
       ['GALILEO’S TELESCOPE', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Padua, January 1610', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
@@ -666,8 +715,11 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // ── The Webb ─────────────────────────────────────────────────────────
   const webbPlace = new THREE.Group(); webbPlace.name = 'Webb telescope';
   webbPlace.position.set(WEBB.x, 0, WEBB.z); webbPlace.rotation.y = WEBB.turn; group.add(webbPlace);
-  // Its lectern, to the left of the way in, toward the telescope.
-  const lectern = facing(new THREE.Group(), -3.8, ARRIVAL.z - 4.4, ARRIVAL.x, ARRIVAL.z);
+  // Its lectern and its orrery stand at the Webb, just outside its ground, either side of the
+  // way to it from the door and turned to the visitor coming that way: each on the middle of a
+  // square, twelve metres from the centre and eighteen and three-quarter degrees off the axis.
+  const besideWebb = side => ({x: side * Math.sin(18.75 * deg) * 12, z: Math.cos(18.75 * deg) * 12});
+  const lectern = facing(new THREE.Group(), besideWebb(-1).x, besideWebb(-1).z, ARRIVAL.x, ARRIVAL.z);
   {
     box(lectern, [1.5, 1.0, .46], [0, .5, 0], M.slate); box(lectern, [1.58, .045, .54], [0, 1.02, 0], M.gold);
     const rake = new THREE.Group(); rake.position.set(0, 1.34, .04); rake.rotation.x = -.52; lectern.add(rake);
@@ -685,7 +737,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // Across the way from the lectern, a small orrery of where the Webb works: L2, a million and a half
   // kilometres beyond the Earth, always behind it, circling a point it cannot stop at, its sunshield
   // turned to the Sun, the Earth and the Moon together. Drawn far closer than it is.
-  const orrery = facing(new THREE.Group(), 3.8, ARRIVAL.z - 4.4, ARRIVAL.x, ARRIVAL.z);
+  const orrery = facing(new THREE.Group(), besideWebb(1).x, besideWebb(1).z, ARRIVAL.x, ARRIVAL.z);
   const l2 = {year: 0};
   {
     const turned = (profile, material) => { const m = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), 40), material); orrery.add(m); return m; };
@@ -749,7 +801,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
    */
   const kit = {
     THREE, M, deg, radius: R, STAGE, box, plane, lettering, canvasFor, texture, seeded, wrapped, board,
-    onWall, inRoom, facing, press, plaque,
+    onWall, inRoom, facing, press, plaque, plaqueAt,
     /** Parts that move, and so keep meshes of their own when the room's still parts are merged. */
     moving: (...parts) => moving.push(...parts),
     /** Merge a moving part's own pieces, in its own frame, leaving out the parts within it that move on their own. */
@@ -822,7 +874,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     }
   }
   // Straight ahead of the way in, so the plan lies the way the room does to the visitor reading it.
-  const mapDesk = facing(new THREE.Group(), ARRIVAL.x, ARRIVAL.z - 3.2, ARRIVAL.x, ARRIVAL.z);
+  const mapDesk = facing(new THREE.Group(), ARRIVAL.x, ARRIVAL.z - 3, ARRIVAL.x, ARRIVAL.z);
   {
     box(mapDesk, [1.7, 1.0, .5], [0, .5, 0], M.slate); box(mapDesk, [1.78, .045, .58], [0, 1.02, 0], M.gold);
     const rake = new THREE.Group(); rake.position.set(0, 1.38, .06); rake.rotation.x = -.62; mapDesk.add(rake);

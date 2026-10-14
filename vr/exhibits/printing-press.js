@@ -206,7 +206,7 @@ export function createPrintingPress(kit, {angle}) {
   proxy.position.set(0, 1.1, .1); press.add(proxy);
   kit.press(proxy, () => open(), 'Printing press');
   {
-    const p = kit.inRoom(wall, 3.0, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE PRINTING PRESS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Johannes Gutenberg, Mainz, about 1450', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

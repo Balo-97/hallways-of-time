@@ -383,7 +383,7 @@ export function createContinentalDrift(kit, {angle}) {
   paintRecord();
 
   {
-    const p = kit.inRoom(wall, 3.3, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['CONTINENTAL DRIFT', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Wegener, 1912 · the seafloor, 1960s', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

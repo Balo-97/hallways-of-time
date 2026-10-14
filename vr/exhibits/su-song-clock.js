@@ -331,7 +331,7 @@ export function createSuSongClock(kit, {angle}) {
   proxy.position.y = 1.8; tower.add(proxy);
   kit.press(proxy, () => open(), 'Su Song’s clock tower');
   {
-    const p = kit.inRoom(wall, 2.3, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['SU SONG’S CLOCK TOWER', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Kaifeng, 1092 · a model, much smaller', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

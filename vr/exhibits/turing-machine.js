@@ -248,7 +248,7 @@ export function createTuringMachine(kit, {angle}) {
   proxy.position.y = 1.1; desk.add(proxy);
   kit.press(proxy, () => open(), 'Turing machine');
   {
-    const p = kit.inRoom(wall, 2.5, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['ON COMPUTABLE NUMBERS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Alan Turing, Cambridge, 1936', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

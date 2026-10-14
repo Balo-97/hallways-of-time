@@ -271,7 +271,7 @@ export function createTwoJupiters(kit, {angle, nights, drawLens, credit}) {
 
   // Its plaque at the front right of the stage, as every bay's is.
   {
-    const p = kit.inRoom(kit.onWall(angle, 0), 2.4, kit.STAGE + 1.6);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['TWO JUPITERS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Galileo, 1610 · Webb, 2022', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

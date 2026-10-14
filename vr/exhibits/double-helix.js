@@ -167,7 +167,7 @@ export function createDoubleHelix(kit, {angle}) {
   proxy.position.y = 1.25; plinth.add(proxy);
   kit.press(proxy, () => open(), 'The double helix');
   {
-    const p = kit.inRoom(wall, 1.9, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE DOUBLE HELIX', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Cambridge and London, 1953', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

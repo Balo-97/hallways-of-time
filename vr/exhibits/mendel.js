@@ -164,7 +164,7 @@ export function createMendel(kit, {angle}) {
   kit.plane(bench, 1.4, .26, [0, BENCH.y + 1.15, -BENCH.d / 2], kit.lettering(1.4, .26, [
     ['TALL × SHORT', .1, .07, '#e1c393', '600 #px Arial, sans-serif'], ['and then the grandchildren', .19, .05, '#f1ddba', 'italic #px Georgia, serif']], '#23303b'));
   {
-    const p = kit.inRoom(wall, 2.0, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['MENDEL’S PEAS', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Gregor Mendel, Brno, published 1866', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

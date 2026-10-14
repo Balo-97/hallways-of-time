@@ -404,7 +404,7 @@ export function createPeriodicTable(kit, {angle}) {
     }, 'The periodic table');
   }
   {
-    const p = kit.inRoom(wall, W / 2 + .9, kit.STAGE - .26 + 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE PERIODIC TABLE', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Mendeleev, St Petersburg, 1869', .13, .034, '#c8b793', 'italic #px Georgia, serif'],

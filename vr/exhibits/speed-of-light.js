@@ -235,7 +235,7 @@ export function createSpeedOfLight(kit, {angle}) {
   proxy.position.y = 1.05; table.add(proxy);
   kit.press(proxy, () => open(), 'Rømer’s orrery');
   {
-    const p = kit.inRoom(wall, 2.5, 1.5);
+    const p = kit.plaqueAt(angle);   // front right, where every bay's plaque stands
     kit.plaque(p.x, p.z, 0, 0, [
       ['THE SPEED OF LIGHT', .07, .042, '#e1c393', '600 #px Arial, sans-serif'],
       ['Ole Rømer, Paris, 1676', .13, .034, '#c8b793', 'italic #px Georgia, serif'],
