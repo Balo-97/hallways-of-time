@@ -568,7 +568,7 @@ function move(dx,dz,dt){
 /** Rise (+1) or descend (-1): never below the floor, and always half a metre under the vault. */
 function rise(amount,dt){
   getCamera().getWorldPosition(head);
-  const eye=head.y-rig.position.y,vault=wing?.contains(head.z)?wing.ceiling:7+5.7*Math.sqrt(Math.max(0,1-(head.x/9)**2));
+  const eye=head.y-rig.position.y,vault=wing?.contains(head.z)?wing.ceilingAt(head.x,head.z):7+5.7*Math.sqrt(Math.max(0,1-(head.x/9)**2));
   rig.position.y=THREE.MathUtils.clamp(rig.position.y+amount*dt*pace().rise,0,Math.max(0,vault-.5-eye));
 }
 /** Fall back to the default headset resolution if frames are being dropped for several seconds. */
@@ -763,7 +763,7 @@ async function init(){
       interactive:()=>goInteractive()
     });
     wing=createInteractiveWing(THREE,scene,{
-      raycaster,place:(group,distance)=>panelAt(group,distance),
+      raycaster,materials:journey.materials,place:(group,distance)=>panelAt(group,distance),
       opened:()=>{closeStory();closeMenu();},returnToMuseum:()=>returnFromWing(),
       // The Webb's parts arrive with its model, after the rest of the museum.
       added:spots=>pickables.push(...spots)

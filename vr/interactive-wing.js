@@ -24,11 +24,23 @@ import {loadGLB} from './glb.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
-// The room in its own metres: x across, z along, the way in at +z.
-const ROOM = {halfX: 15, front: 24, back: -24, height: 17};
-const ARRIVAL = {x: 0, z: 20.5, yaw: 0};
+/**
+ * A rotunda, in its own metres about its centre: a drum of wall under a dome,
+ * the way in at +z. Places on the wall are given by their angle from the way
+ * in, turning toward +x, the visitor's right as they arrive.
+ */
+const ROOM = {radius: 22, drum: 12, dome: 10};
+const ARRIVAL = {x: 0, z: 18.5, yaw: 0};
 // NASA's model looks along its +x; turned a quarter, its mirror faces the way in.
-const WEBB = {x: 0, z: -4, turn: -Math.PI / 2};
+const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
+// The floor the Webb stands on, roped off by a gilt ellipse: all of the
+// telescope lies inside 14.5 by 8.2 metres about its centre, and the rope
+// stands clear of that.
+const ROPE = {along: 15.2, across: 8.9};
+// Where things stand round the wall, in degrees from the way in.
+const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55};
+// Where Jupiter is painted in Galileo's window, from the middle of its sill: the telescope points there.
+const JUPITER_IN_WINDOW = {x: .25, y: 3.0};
 const MOON_ORBITS = [5.9, 9.4, 15, 26.4];   // mean distances, Jupiter radii
 const MOON_NAMES = ['Io', 'Europa', 'Ganymede', 'Callisto'];
 
@@ -88,12 +100,18 @@ export function createInteractiveWing(THREE, scene, callbacks) {
 
   // ── Materials and the small makers ───────────────────────────────────
   const std = (color, extra = {}) => new THREE.MeshStandardMaterial({color, roughness: .6, ...extra});
+  // The halls' own marble, gilt and floor, so the rotunda is built of the same
+  // stone as the rest of the museum; its own materials only where the halls have none.
+  const hall = callbacks.materials || {};
   const M = {
-    floor: std('#30343b', {roughness: .34, metalness: .12}), wall: std('#ebe2cf', {roughness: .82}),
-    skirting: std('#3b3c40', {roughness: .5}), gold: std('#c9a664', {metalness: .62, roughness: .3}),
+    floor: hall.floor || std('#ece5d5', {roughness: .3, metalness: .06}),
+    ivory: hall.ivory || std('#fff7e8', {roughness: .43}), gold: hall.gold || std('#c4a564', {metalness: .52, roughness: .33}),
+    stone: hall.shades?.[0] || std('#253f60', {roughness: .34}),
+    plaster: std('#f5e9d4', {roughness: .78, emissive: '#d3c5ac', emissiveIntensity: .1}),
     slate: std('#24303b', {roughness: .48}), wood: std('#5b3b24', {roughness: .62}), darkWood: std('#3a2618', {roughness: .58}),
     leather: std('#6a4428', {roughness: .74}), brass: std('#b48d4c', {metalness: .7, roughness: .32}),
-    paper: std('#efe4c8', {roughness: .9}), ink: std('#1b1b22', {roughness: .3, metalness: .2})
+    paper: std('#efe4c8', {roughness: .9}), ink: std('#1b1b22', {roughness: .3, metalness: .2}),
+    bronze: std('#2c3a4c', {metalness: .12, roughness: .47})
   };
   const box = (parent, size, position, material) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(...size), material); m.position.set(...position); parent.add(m); return m;
@@ -124,43 +142,164 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const invisible = new THREE.MeshBasicMaterial({visible: false});
   function seeded(seed) { return () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296); }
 
-  // ── The room ─────────────────────────────────────────────────────────
-  const W = ROOM.halfX * 2, L = ROOM.front - ROOM.back, H = ROOM.height, midZ = (ROOM.front + ROOM.back) / 2;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, L), M.floor);
-  floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, midZ); floor.name = 'Interactive museum floor';
-  floor.userData.floor = true; group.add(floor); pickables.push(floor);
-  for (const side of [-1, 1]) {
-    box(group, [.3, H, L], [side * (ROOM.halfX + .15), H / 2, midZ], M.wall);
-    box(group, [.06, .32, L], [side * (ROOM.halfX - .03), .16, midZ], M.skirting);
-    box(group, [.14, .22, L], [side * (ROOM.halfX - .07), 12.4, midZ], M.gold);
+  // ── The rotunda ──────────────────────────────────────────────────────
+  const R = ROOM.radius, DRUM = ROOM.drum, DOME = ROOM.dome, deg = Math.PI / 180;
+  /**
+   * A frame on the wall at `angle` degrees from the way in, `inset` metres in
+   * from it: x runs along the wall to the right of someone facing it, y up,
+   * and z out from the wall toward the centre of the room.
+   */
+  function onWall(angle, inset = 0) {
+    const a = angle * deg, frame = new THREE.Group();
+    frame.position.set(Math.sin(a) * (R - inset), 0, Math.cos(a) * (R - inset));
+    frame.rotation.y = a + Math.PI; frame.updateMatrix();
+    group.add(frame);
+    return frame;
   }
-  for (const z of [ROOM.front, ROOM.back]) {
-    const facing = Math.sign(-z);
-    box(group, [W + .6, H, .3], [0, H / 2, z - facing * .15], M.wall);
-    box(group, [W, .32, .06], [0, .16, z + facing * .03], M.skirting);
-    box(group, [W, .22, .14], [0, 12.4, z + facing * .07], M.gold);
+  /** A point given in a wall frame, in the room's own metres. */
+  const inRoom = (frame, x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(frame.matrix);
+  /** Stand `object` at x, z in the room, turned to face the point tx, tz. */
+  function facing(object, x, z, tx, tz) {
+    object.position.set(x, 0, z); object.rotation.y = Math.atan2(tx - x, tz - z); group.add(object); return object;
   }
-  // A night sky for a ceiling: the gallery is about looking up.
+
+  // The floor is the halls' own: the same marble squares and inlaid diamonds,
+  // the same polish, laid square to the room metre for metre as theirs are.
+  // Their floor spreads its pattern over 18 by 242 metres, so these UVs do too.
   {
-    const c = document.createElement('canvas'); c.width = c.height = 1024; const ctx = c.getContext('2d');
-    const sky = ctx.createRadialGradient(512, 512, 60, 512, 512, 720); sky.addColorStop(0, '#1b2846'); sky.addColorStop(1, '#0a1124');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, 1024, 1024);
-    const r = seeded(1610);
-    for (let i = 0; i < 900; i++) { const s = r() ** 3 * 2.4 + .5; ctx.fillStyle = `rgba(255,${235 + r() * 20 | 0},${200 + r() * 55 | 0},${.35 + r() * .6})`; ctx.beginPath(); ctx.arc(r() * 1024, r() * 1024, s, 0, Math.PI * 2); ctx.fill(); }
-    const map = texture(c); map.wrapS = map.wrapT = THREE.RepeatWrapping; map.repeat.set(2, 3);
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshBasicMaterial({map}));
-    ceiling.rotation.x = Math.PI / 2; ceiling.position.set(0, H, midZ); group.add(ceiling);
+    const geometry = new THREE.CircleGeometry(R, 128), p = geometry.attributes.position, uv = geometry.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 18 + .5, p.getY(i) / 242 + .5);
+    const floor = new THREE.Mesh(geometry, M.floor);
+    floor.rotation.x = -Math.PI / 2; floor.name = 'Interactive museum floor';
+    floor.userData.floor = true; group.add(floor); pickables.push(floor);
   }
-  // The title, high on the far wall, above the Webb.
-  plane(group, 14, 2.4, [0, 14.6, ROOM.back + .2], lettering(14, 2.4, [
-    ['THE INTERACTIVE MUSEUM', .95, .78, '#e1c393', '600 #px Arial, sans-serif'],
-    ['From Galileo’s spyglass to the Webb’s golden mirror', 1.72, .5, '#f1ddba', 'italic #px Georgia, serif']], '#23303b'));
-  box(group, [14.3, 2.7, .08], [0, 14.6, ROOM.back + .14], M.gold);
+  const flat = (geometry, material, y) => { const m = new THREE.Mesh(geometry, material); m.rotation.x = -Math.PI / 2; m.position.y = y; group.add(m); return m; };
+  // A border of blue stone, edged in gilt, round the foot of the wall.
+  flat(new THREE.RingGeometry(R - 1.3, R, 128, 1), M.stone, .008);
+  flat(new THREE.RingGeometry(R - 1.44, R - 1.36, 128, 1), M.gold, .01);
+  /** A flat band `width` wide along the ellipse of half-axes `along` (z) and `across` (x). */
+  function ellipseBand(along, across, width) {
+    const points = [], index = [], steps = 192;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps * Math.PI * 2, s = Math.sin(t), c = Math.cos(t);
+      const nx = s / across, nz = c / along, l = Math.hypot(nx, nz);
+      for (const side of [1, -1]) points.push(across * s + side * width / 2 * nx / l, 0, along * c + side * width / 2 * nz / l);
+      if (i < steps) index.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); geometry.setIndex(index); geometry.computeVertexNormals();
+    // Wound to face up, whichever way the arithmetic went.
+    if (geometry.attributes.normal.getY(0) < 0) { geometry.setIndex(index.map((v, i) => index[i - i % 3 + 2 - i % 3])); geometry.computeVertexNormals(); }
+    return geometry;
+  }
+  for (const [grow, width] of [[0, .08], [.32, .035]]) {
+    const rope = new THREE.Mesh(ellipseBand(ROPE.along + grow, ROPE.across + grow, width), M.gold);
+    rope.position.set(WEBB.x, .012, WEBB.z); group.add(rope);
+  }
+  // The halls' floor medallions — two gilt rings and eight petals of stone —
+  // where a visitor arrives and before each exhibit on the wall.
+  const medallions = [[ARRIVAL.x, ARRIVAL.z]];
+  // The wall: a drum of plaster with a marble skirting, a dado rail and a cornice.
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, DRUM, 160, 1, true), M.plaster);
+  drum.material = M.plaster.clone(); drum.material.side = THREE.BackSide;
+  drum.position.y = DRUM / 2; group.add(drum);
+  const band = (radius, tube, y, material) => {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 192), material);
+    m.rotation.x = Math.PI / 2; m.position.y = y; group.add(m); return m;
+  };
+  band(R - .04, .15, .12, M.ivory);
+  band(R - .02, .05, 1.22, M.ivory); band(R - .02, .022, 1.32, M.gold);
+  band(R - .12, .3, DRUM - .12, M.ivory); band(R - .18, .045, DRUM - .5, M.gold);
+  // The frieze, under the cornice, lettered in four quarters: the museum's
+  // name over the Webb, each discoverer on his own side, and over the door.
+  const FRIEZE = {y: DRUM - 1.15, height: 1};
+  {
+    const quarters = [[180, 'THE INTERACTIVE MUSEUM'], [-90, 'GALILEO GALILEI · PADUA · 1610'],
+      [90, 'THE JAMES WEBB SPACE TELESCOPE · 2021'], [0, 'LOOK WHERE THEY LOOKED']];
+    // A quarter of the frieze is 34.5 m long and a metre high: 2,048 by 60 pixels keeps the letters square.
+    for (const [angle, words] of quarters) {
+      const c = document.createElement('canvas'); c.width = 2048; c.height = 60; const ctx = c.getContext('2d');
+      ctx.fillStyle = '#23303b'; ctx.fillRect(0, 0, 2048, 60);
+      ctx.fillStyle = '#e1c393'; ctx.font = '600 32px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.letterSpacing = '9px'; ctx.fillText(words, 1024, 31);
+      const half = ctx.measureText(words).width / 2;
+      ctx.letterSpacing = '0px'; ctx.font = '22px Arial, sans-serif';
+      for (let x = 1024 - half - 60; x > 30; x -= 150) ctx.fillText('✦', x, 31);
+      for (let x = 1024 + half + 60; x < 2018; x += 150) ctx.fillText('✦', x, 31);
+      const map = texture(c); map.wrapS = THREE.RepeatWrapping; map.repeat.set(-1, 1);   // read from inside the drum
+      const segment = new THREE.CylinderGeometry(R - .07, R - .07, FRIEZE.height, 64, 1, true, (angle - 45) * deg, 90 * deg);
+      const frieze = new THREE.Mesh(segment, new THREE.MeshBasicMaterial({map, side: THREE.BackSide}));
+      frieze.position.y = FRIEZE.y; group.add(frieze);
+    }
+    // Gilt above and below it.
+    band(R - .1, .05, FRIEZE.y - FRIEZE.height / 2 - .08, M.gold);
+  }
+  // Ivory pilasters every fifteen degrees, except where the door, the window and
+  // the pictures are, standing up to the frieze rather than across it.
+  {
+    const kept = [[PLACES.door, 6.5], [PLACES.galileo, 5.5], [PLACES.galileoView, 3.5], [PLACES.webbView, 4.5]];
+    const angles = [];
+    for (let a = -172.5; a < 180; a += 15) if (!kept.some(([at, half]) => Math.abs(((a - at + 540) % 360) - 180) < half + 2.5)) angles.push(a);
+    const top = FRIEZE.y - FRIEZE.height / 2 - .2, shaft = top - .3 - .34;
+    const parts = [[new THREE.BoxGeometry(.7, shaft, .22), M.ivory, .3 + shaft / 2, .11],
+      [new THREE.BoxGeometry(.86, .5, .3), M.ivory, .25, .15], [new THREE.BoxGeometry(.9, .34, .32), M.gold, top - .17, .16]];
+    const o = new THREE.Object3D();
+    for (const [geometry, material, y, inset] of parts) {
+      const mesh = new THREE.InstancedMesh(geometry, material, angles.length);
+      angles.forEach((angle, i) => {
+        const a = angle * deg;
+        o.position.set(Math.sin(a) * (R - inset), y, Math.cos(a) * (R - inset)); o.rotation.set(0, a, 0); o.updateMatrix();
+        mesh.setMatrixAt(i, o.matrix);
+      });
+      group.add(mesh);
+    }
+  }
+  // The dome: a night sky, the gallery being about looking up, held by gilt ribs.
+  {
+    const W = 2048, H = 1024, c = document.createElement('canvas'); c.width = W; c.height = H; const ctx = c.getContext('2d');
+    const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#0a1124'); sky.addColorStop(.75, '#16234a'); sky.addColorStop(1, '#2a3a63');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    // The canvas wraps 138 m of rim with 2,048 pixels but climbs the 25 m to
+    // the crown with 1,024, so a pixel is some 2.7 times wider on the dome than
+    // it is tall, and wider still toward the crown, where a row of texels is a
+    // small circle. Stars are drawn narrow by as much, and thin out toward the
+    // crown, so they lie evenly over the dome and stay round.
+    const r = seeded(1610), wider = 2 * Math.PI * R / W / (Math.PI / 2 * (R + DOME) / 2 / H);
+    for (let i = 0; i < 2400; i++) {
+      const y = r() * H, around = Math.sin(y / H * Math.PI / 2);
+      if (r() > around) continue;
+      const size = r() ** 4 * 2.6 + .8;
+      ctx.fillStyle = `rgba(255,${235 + r() * 20 | 0},${200 + r() * 55 | 0},${.4 + r() * .6})`;
+      ctx.beginPath(); ctx.ellipse(r() * W, y, Math.min(size / wider / Math.max(around, .05), 40), size, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    const map = texture(c);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 32, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({map, side: THREE.BackSide, fog: false}));
+    dome.scale.y = DOME / R; dome.position.y = DRUM; group.add(dome);
+    const ribs = new THREE.InstancedMesh(new THREE.TorusGeometry(R - .3, .1, 6, 48, Math.PI / 2), M.gold, 12), o = new THREE.Object3D();
+    for (let i = 0; i < 12; i++) { o.position.set(0, DRUM, 0); o.rotation.set(0, i * Math.PI / 6, 0); o.scale.set(1, DOME / R, 1); o.updateMatrix(); ribs.setMatrixAt(i, o.matrix); }
+    group.add(ribs);
+    const boss = new THREE.Mesh(new THREE.TorusGeometry(1.1, .16, 8, 48), M.gold);
+    boss.rotation.x = Math.PI / 2; boss.position.y = DRUM + DOME - .3; group.add(boss);
+  }
+  // The way in, behind the visitor as they arrive: bronze doors, and the way back above them.
+  {
+    const door = onWall(PLACES.door, .16), W = 4.2, H = 6.2;
+    for (const side of [-1, 1]) {
+      box(door, [W / 2 - .03, H, .14], [side * W / 4, H / 2, .07], M.bronze);
+      for (const y of [H * .25, H * .7]) box(door, [W / 2 - .5, H * .36, .04], [side * W / 4, y, .16], M.ivory);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(.32, .022, 6, 36), M.gold); ring.position.set(side * W / 4, H * .48, .2); door.add(ring);
+    }
+    for (const side of [-1, 1]) box(door, [.24, H + .3, .3], [side * (W / 2 + .12), (H + .3) / 2, .1], M.gold);
+    box(door, [W + .72, .3, .3], [0, H + .15, .1], M.gold);
+    const back = plane(door, W, .5, [0, H + .62, .26], lettering(W, .5, [['←  RETURN TO THE MUSEUM', .25, .2, '#e1c393', '600 #px Arial, sans-serif']], '#23303b'));
+    press(back, () => callbacks.returnToMuseum?.(), 'Return to the museum (door)');
+  }
 
   // ── Galileo's corner: a window on the night, a telescope, a notebook ─
-  const window_ = {z: 17, bottom: 1.6, width: 3.4, height: 5.6};
+  const window_ = {bottom: 1.6, width: 3.4, height: 5.6};
+  const galileoWall = onWall(PLACES.galileo, .12);
   {
-    // The arched window on the left wall, with an evening over Padua in it.
+    // The arched window, with an evening over Padua in it.
     const shape = new THREE.Shape(), w = window_.width / 2, straight = window_.height - w;
     shape.moveTo(-w, 0); shape.lineTo(w, 0); shape.lineTo(w, straight); shape.absarc(0, straight, w, 0, Math.PI, false); shape.lineTo(-w, 0);
     const geometry = new THREE.ShapeGeometry(shape, 24), uv = geometry.attributes.uv, pos = geometry.attributes.position;
@@ -171,7 +310,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const r = seeded(7);
     for (let i = 0; i < 260; i++) { ctx.fillStyle = `rgba(255,248,230,${.3 + r() * .6})`; ctx.beginPath(); ctx.arc(r() * sw, r() * sh * .8, .004 + r() ** 4 * .012, 0, Math.PI * 2); ctx.fill(); }
     // Jupiter, the brightest point in the evening sky, where the telescope looks.
-    const jx = sw / 2 + .25, jy = sh - 3.0;
+    const jx = sw / 2 + JUPITER_IN_WINDOW.x, jy = sh - JUPITER_IN_WINDOW.y;
     const glow = ctx.createRadialGradient(jx, jy, 0, jx, jy, .22); glow.addColorStop(0, 'rgba(255,244,214,.95)'); glow.addColorStop(.12, 'rgba(255,236,200,.55)'); glow.addColorStop(1, 'rgba(255,236,200,0)');
     ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(jx, jy, .22, 0, Math.PI * 2); ctx.fill();
     // Roofs and a bell tower against the last of the light.
@@ -180,30 +319,32 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     for (const [x, y] of [[0, sh - .5], [.5, sh - .55], [.75, sh - .75], [1.0, sh - .55], [1.45, sh - .6], [1.45, sh - 1.75], [1.52, sh - 1.95], [1.6, sh - 1.75], [1.6, sh - .7], [2.1, sh - .65], [2.35, sh - .9], [2.65, sh - .62], [3.4, sh - .5], [3.4, sh]]) ctx.lineTo(x, y);
     ctx.fill();
     const glass = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({map: texture(canvas)}));
-    glass.position.set(-ROOM.halfX + .02, window_.bottom, window_.z); glass.rotation.y = Math.PI / 2; group.add(glass);
+    glass.position.y = window_.bottom; galileoWall.add(glass);
     // A gilt frame: jambs, sill and arch.
-    for (const side of [-1, 1]) box(group, [.12, straight, .16], [-ROOM.halfX + .06, window_.bottom + straight / 2, window_.z + side * (w + .06)], M.gold);
-    box(group, [.2, .12, window_.width + .4], [-ROOM.halfX + .1, window_.bottom - .06, window_.z], M.gold);
-    const arch = new THREE.Mesh(new THREE.TorusGeometry(w + .06, .07, 6, 32, Math.PI), M.gold);
-    arch.position.set(-ROOM.halfX + .06, window_.bottom + straight, window_.z); arch.rotation.y = Math.PI / 2; group.add(arch);
+    for (const side of [-1, 1]) box(galileoWall, [.16, straight, .14], [side * (w + .08), window_.bottom + straight / 2, .02], M.gold);
+    box(galileoWall, [window_.width + .44, .12, .26], [0, window_.bottom - .06, .08], M.gold);
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(w + .08, .08, 6, 32, Math.PI), M.gold);
+    arch.position.set(0, window_.bottom + straight, .02); galileoWall.add(arch);
+    medallions.push(inRoom(galileoWall, 0, 3.4).toArray().filter((_, i) => i !== 1));
   }
   // The telescope: a tapering tube about a metre long, leather over wood, on a stand.
   const scope = new THREE.Group(); scope.name = 'Galileo’s telescope';
-  const pivot = new THREE.Vector3(-11.4, 1.75, window_.z);
   {
-    const target = new THREE.Vector3(-ROOM.halfX, window_.bottom + window_.height - 3.0, window_.z + .25);
-    scope.position.copy(pivot); scope.lookAt(target); group.add(scope);
+    const pivot = new THREE.Vector3(0, 1.75, 3.4);
+    scope.position.copy(pivot); galileoWall.add(scope);
+    group.updateMatrixWorld(true);
+    scope.lookAt(galileoWall.localToWorld(new THREE.Vector3(JUPITER_IN_WINDOW.x, window_.bottom + JUPITER_IN_WINDOW.y, 0)));
     // Built along +z, which lookAt turns toward the window.
     const tube = new THREE.Mesh(new THREE.CylinderGeometry(.024, .017, .93, 24, 1, true), M.leather);
     tube.rotation.x = Math.PI / 2; scope.add(tube);
-    for (const z of [-.44, -.2, .1, .4]) { const band = new THREE.Mesh(new THREE.CylinderGeometry(.0235 - z * .008, .0235 - z * .008, .018, 24), M.gold); band.rotation.x = Math.PI / 2; band.position.z = z; scope.add(band); }
+    for (const z of [-.44, -.2, .1, .4]) { const ring = new THREE.Mesh(new THREE.CylinderGeometry(.0235 - z * .008, .0235 - z * .008, .018, 24), M.gold); ring.rotation.x = Math.PI / 2; ring.position.z = z; scope.add(ring); }
     const lens = new THREE.Mesh(new THREE.CylinderGeometry(.027, .026, .035, 24), M.brass); lens.rotation.x = Math.PI / 2; lens.position.z = .475; scope.add(lens);
     const eyepiece = new THREE.Mesh(new THREE.CylinderGeometry(.012, .014, .06, 16), M.darkWood); eyepiece.rotation.x = Math.PI / 2; eyepiece.position.z = -.49; scope.add(eyepiece);
     // A proxy larger than the slim tube, so it is easy to aim at.
     const handle = new THREE.Mesh(new THREE.BoxGeometry(.32, .32, 1.15), invisible); scope.add(handle);
     press(handle, () => openTelescope(), 'Galileo’s telescope');
     // The stand: three legs, a column and a cradle.
-    const stand = new THREE.Group(); stand.position.set(pivot.x, 0, pivot.z); group.add(stand);
+    const stand = new THREE.Group(); stand.position.set(pivot.x, 0, pivot.z); galileoWall.add(stand);
     box(stand, [.07, pivot.y - .12, .07], [0, (pivot.y - .12) / 2 + .02, 0], M.wood);
     // Each leg runs from the column, half a metre up, out to the floor.
     const top = new THREE.Vector3(0, .55, 0), up = new THREE.Vector3(0, 1, 0);
@@ -213,11 +354,12 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       leg.position.copy(foot).addScaledVector(span, .5); leg.quaternion.setFromUnitVectors(up, span.normalize()); stand.add(leg);
     }
     box(stand, [.12, .07, .16], [0, pivot.y - .08, 0], M.brass);
-    obstacles.push({x: pivot.x, z: pivot.z, halfX: .6, halfZ: .6});
+    const at = inRoom(galileoWall, pivot.x, pivot.z);
+    obstacles.push({x: at.x, z: at.z, r: .55});
   }
-  // The plaque before it.
+  // The plaque before it, turned to the room.
   {
-    const stand = new THREE.Group(); stand.position.set(-9.9, 0, window_.z + 1.5); stand.rotation.y = Math.PI / 2 - .35; group.add(stand);
+    const at = inRoom(galileoWall, 1.9, 4.9), stand = facing(new THREE.Group(), at.x, at.z, 0, 8);
     box(stand, [.9, .95, .36], [0, .475, 0], M.slate); box(stand, [.98, .04, .44], [0, .97, 0], M.gold);
     const rake = new THREE.Group(); rake.position.set(0, 1.22, .03); rake.rotation.x = -.55; stand.add(rake);
     box(rake, [.94, .58, .03], [0, 0, -.02], M.gold);
@@ -231,12 +373,12 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['A tube about a metre long, magnifying', .45, .028, '#a99a7c', 'italic #px Georgia, serif'],
       ['about twenty times.', .49, .028, '#a99a7c', 'italic #px Georgia, serif']]));
     press(plate, () => openTelescope(), 'Galileo plaque');
-    obstacles.push({x: -9.9, z: window_.z + 1.5, halfX: .55, halfZ: .55});
+    obstacles.push({x: at.x, z: at.z, r: .55});
   }
   // A desk with the visitor's notebook open on it: every evening they look at is written in.
   const book = {canvas: null, map: null};
   {
-    const desk = new THREE.Group(); desk.position.set(-11.6, 0, window_.z - 3.4); desk.rotation.y = Math.PI / 2; group.add(desk);
+    const at = inRoom(galileoWall, -2.5, 2.9), desk = facing(new THREE.Group(), at.x, at.z, 0, 8);
     box(desk, [1.5, .06, .78], [0, .76, 0], M.wood);
     for (const [x, z] of [[-.68, -.33], [.68, -.33], [-.68, .33], [.68, .33]]) box(desk, [.06, .73, .06], [x, .365, z], M.darkWood);
     // Read from half a metre, so painted finer than the signs: 2,000 pixels a metre.
@@ -247,20 +389,15 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     const well = new THREE.Mesh(new THREE.CylinderGeometry(.035, .04, .06, 16), M.ink); well.position.set(.56, .82, -.2); desk.add(well);
     const quill = new THREE.Mesh(new THREE.ConeGeometry(.012, .32, 6), M.paper); quill.position.set(.56, .93, -.17); quill.rotation.set(.5, 0, -.25); desk.add(quill);
     press(pages, () => openTelescope(), 'Notebook');
-    obstacles.push({x: -11.6, z: window_.z - 3.4, halfX: .55, halfZ: .9});
+    obstacles.push({x: at.x, z: at.z, r: .95});
   }
 
   // ── The Webb ─────────────────────────────────────────────────────────
   const webbPlace = new THREE.Group(); webbPlace.name = 'Webb telescope';
   webbPlace.position.set(WEBB.x, 0, WEBB.z); webbPlace.rotation.y = WEBB.turn; group.add(webbPlace);
-  // The floor it stands on is roped off by a gilt line; the visitor walks round it.
-  const FOOT = {halfX: 7.8, front: WEBB.z + 14.1, back: WEBB.z - 14.1};
-  for (const [w, d, x, z] of [[FOOT.halfX * 2, .06, 0, FOOT.front], [FOOT.halfX * 2, .06, 0, FOOT.back], [.06, FOOT.front - FOOT.back, -FOOT.halfX, WEBB.z], [.06, FOOT.front - FOOT.back, FOOT.halfX, WEBB.z]])
-    box(group, [w, .012, d], [x, .006, z], M.gold);
-  obstacles.push({x: 0, z: WEBB.z, halfX: FOOT.halfX + .3, halfZ: 14.1 + .3});
   // Its lectern, between the way in and the telescope.
+  const lectern = facing(new THREE.Group(), -3.2, 14.6, ARRIVAL.x, ARRIVAL.z);
   {
-    const lectern = new THREE.Group(); lectern.position.set(-2.6, 0, 13.4); lectern.rotation.y = .35; group.add(lectern);
     box(lectern, [1.5, 1.0, .46], [0, .5, 0], M.slate); box(lectern, [1.58, .045, .54], [0, 1.02, 0], M.gold);
     const rake = new THREE.Group(); rake.position.set(0, 1.34, .04); rake.rotation.x = -.52; lectern.add(rake);
     box(rake, [1.52, .9, .04], [0, 0, -.03], M.gold);
@@ -273,38 +410,36 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['to learn what it does.', .6, .052],
       ['Model: NASA, simplified for this museum', .74, .036, '#a99a7c', 'italic #px Georgia, serif']]));
     press(plate, () => openPart('webb'), 'Webb lectern');
-    obstacles.push({x: -2.6, z: 13.4, halfX: .9, halfZ: .5});
+    obstacles.push({x: lectern.position.x, z: lectern.position.z, r: .9});
   }
-  // Jupiter twice on the right wall: as Galileo saw it, and as Webb sees it.
+  // Jupiter twice on the wall to the right: as Galileo saw it, and as Webb sees it.
   const jupiterFrames = {galileo: null, webb: null};
   {
-    const x = ROOM.halfX - .06, turn = -Math.PI / 2;
-    // Webb's picture, 1646 by 1561 pixels.
-    const wide = 2.9, tall = wide * 1561 / 1646, z = 17.2, y = 3.0;
-    box(group, [.1, tall + .22, wide + .22], [x, y, z], M.gold);
     const placeholder = document.createElement('canvas'); placeholder.width = placeholder.height = 4;
-    const picture = plane(group, wide, tall, [x - .06, y, z], texture(placeholder), turn);
-    jupiterFrames.webb = picture;
-    press(picture, () => openJupiter(), 'Webb’s Jupiter');
-    plane(group, wide + .2, .42, [x - .06, y - tall / 2 - .38, z], lettering(wide + .2, .42, [
+    // Webb's picture, 1646 by 1561 pixels.
+    const webbWall = onWall(PLACES.webbView, .1), wide = 2.9, tall = wide * 1561 / 1646, y = 3.0;
+    box(webbWall, [wide + .22, tall + .22, .1], [0, y, .02], M.gold);
+    jupiterFrames.webb = plane(webbWall, wide, tall, [0, y, .08], texture(placeholder));
+    press(jupiterFrames.webb, () => openJupiter(), 'Webb’s Jupiter');
+    plane(webbWall, wide + .2, .42, [0, y - tall / 2 - .38, .08], lettering(wide + .2, .42, [
       ['JUPITER, SEEN BY WEBB · 27 JULY 2022', .12, .07, '#e1c393', '600 #px Arial, sans-serif'],
       ['Infrared: auroras over both poles, high hazes, the Great Red Spot', .22, .055, '#f1ddba', 'italic #px Georgia, serif'],
-      [JUPITER_CREDIT, .33, .05, '#c4b898', '#px Arial, sans-serif']]), turn);
+      [JUPITER_CREDIT, .33, .05, '#c4b898', '#px Arial, sans-serif']]));
     // Galileo's Jupiter beside it, from the first evening.
-    const small = 1.5, gz = z - wide / 2 - 1.6;
-    box(group, [.1, small + .18, small + .18], [x, y, gz], M.gold);
-    const galileo = plane(group, small, small, [x - .06, y, gz], texture(placeholder), turn);
-    jupiterFrames.galileo = galileo;
-    press(galileo, () => openJupiter(), 'Galileo’s Jupiter');
-    plane(group, small + .5, .42, [x - .06, y - small / 2 - .38, gz], lettering(small + .5, .42, [
+    const galileoView = onWall(PLACES.galileoView, .08), small = 1.5;
+    box(galileoView, [small + .18, small + .18, .1], [0, y, .02], M.gold);
+    jupiterFrames.galileo = plane(galileoView, small, small, [0, y, .08], texture(placeholder));
+    press(jupiterFrames.galileo, () => openJupiter(), 'Galileo’s Jupiter');
+    plane(galileoView, small + .5, .42, [0, y - small / 2 - .38, .08], lettering(small + .5, .42, [
       ['JUPITER, AS GALILEO SAW IT', .12, .07, '#e1c393', '600 #px Arial, sans-serif'],
       ['7 January 1610, from Padua', .23, .055, '#f1ddba', 'italic #px Georgia, serif'],
-      ['Positions: JPL Horizons (NASA)', .33, .05, '#c4b898', '#px Arial, sans-serif']]), turn);
+      ['Positions: JPL Horizons (NASA)', .33, .05, '#c4b898', '#px Arial, sans-serif']]));
+    const mid = (PLACES.galileoView + PLACES.webbView) / 2 * deg;
+    medallions.push([Math.sin(mid) * (R - 3.2), Math.cos(mid) * (R - 3.2)]);
   }
   // The way back, on a desk beside the way in.
   {
-    const at = {x: 4.4, z: 18.4};
-    const desk = new THREE.Group(); desk.position.set(at.x, 0, at.z); desk.rotation.y = Math.atan2(ARRIVAL.x - at.x, ARRIVAL.z - at.z); group.add(desk);
+    const desk = facing(new THREE.Group(), 4.6, 16.2, ARRIVAL.x, ARRIVAL.z);
     box(desk, [1.35, .85, .55], [0, .425, 0], M.slate); box(desk, [1.43, .04, .62], [0, .87, 0], M.gold);
     plane(desk, 2.3, .62, [0, 1.95, 0], lettering(2.3, .62, [
       ['THE INTERACTIVE MUSEUM', .24, .14, '#f1ddba'], ['Galileo · Webb', .44, .11, '#c8b793', 'italic #px Georgia, serif']]));
@@ -312,7 +447,24 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     press(back, () => callbacks.returnToMuseum?.(), 'Return to the museum');
     const scopeAgain = plane(desk, 1.3, .22, [0, .98, .1], lettering(1.3, .22, [['LOOK THROUGH GALILEO’S TELESCOPE', .11, .06, '#f1ddba', '600 #px Arial, sans-serif']]));
     press(scopeAgain, () => openTelescope(), 'Galileo from the desk');
-    obstacles.push({x: at.x, z: at.z, halfX: .9, halfZ: .9});
+    obstacles.push({x: desk.position.x, z: desk.position.z, r: .9});
+  }
+  // The medallions, one draw for each of their three parts.
+  {
+    const o = new THREE.Object3D(), rings = [[1.75, .022], [1.56, .017]];
+    for (const [radius, tube] of rings) {
+      const mesh = new THREE.InstancedMesh(new THREE.TorusGeometry(radius, tube, 6, 56), M.gold, medallions.length);
+      medallions.forEach(([x, z], i) => { o.position.set(x, .022, z); o.rotation.set(Math.PI / 2, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix); });
+      group.add(mesh);
+    }
+    const petals = new THREE.InstancedMesh(new THREE.BoxGeometry(.14, .013, 1.43), M.stone, medallions.length * 8);
+    medallions.forEach(([x, z], i) => {
+      for (let p = 0; p < 8; p++) {
+        const a = p * Math.PI / 4;
+        o.position.set(x + Math.sin(a) * .77, .015, z + Math.cos(a) * .77); o.rotation.set(0, a, 0); o.updateMatrix(); petals.setMatrixAt(i * 8 + p, o.matrix);
+      }
+    });
+    group.add(petals);
   }
 
   // ── Loading what comes from files ────────────────────────────────────
@@ -596,14 +748,17 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   function closePanel() { if (panel) { disposePanel(panel); panel = null; panelTargets = []; } state.panelKind = null; }
 
   // ── Where a visitor may stand ────────────────────────────────────────
-  /** World coordinates; inside the gallery's walls and clear of what stands in it. */
+  /** World coordinates; inside the rotunda's wall, outside the Webb's rope, clear of what stands. */
   function validPosition(x, z) {
     const lz = z - WING_Z;
-    if (Math.abs(x) > ROOM.halfX - .5 || lz > ROOM.front - .5 || lz < ROOM.back + .5) return false;
-    for (const o of obstacles) if (Math.abs(x - o.x) < o.halfX && Math.abs(lz - o.z) < o.halfZ) return false;
+    if (Math.hypot(x, lz) > R - .6) return false;
+    if (((x - WEBB.x) / (ROPE.across + .3)) ** 2 + ((lz - WEBB.z) / (ROPE.along + .3)) ** 2 < 1) return false;
+    for (const o of obstacles) if (Math.hypot(x - o.x, lz - o.z) < o.r) return false;
     return true;
   }
-  const contains = z => z > WING_Z + ROOM.back - 2 && z < WING_Z + ROOM.front + 2;
+  const contains = z => Math.abs(z - WING_Z) < R + 2;
+  /** How high a visitor may rise: under the dome, which is lower toward the wall. */
+  const ceilingAt = (x, z) => DRUM + DOME * Math.sqrt(Math.max(0, 1 - (Math.hypot(x, z - WING_Z) / R) ** 2));
 
   function getState() {
     const night = state.nights?.[state.night];
@@ -620,14 +775,15 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     };
   }
   return {
-    group, pickables, hotspots, contains, validPosition, prepare, setEnvironment,
-    arrival: {x: ARRIVAL.x, z: WING_Z + ARRIVAL.z, yaw: ARRIVAL.yaw}, ceiling: ROOM.height,
+    group, pickables, hotspots, contains, validPosition, ceilingAt, prepare, setEnvironment,
+    arrival: {x: ARRIVAL.x, z: WING_Z + ARRIVAL.z, yaw: ARRIVAL.yaw},
     get panel() { return panel; }, get panelTargets() { return panelTargets; },
     openTelescope, stepNight, setMode, openPart, openJupiter, closePanel, getState,
     /** Where things stand, for tests and the guide: world positions to aim at. */
     targets: () => ({
       telescope: scope.localToWorld(new THREE.Vector3()).toArray(),
-      webbLectern: group.localToWorld(new THREE.Vector3(-2.6, 1.34, 13.4)).toArray(),
+      webbLectern: lectern.localToWorld(new THREE.Vector3(0, 1.34, .04)).toArray(),
+      centre: group.localToWorld(new THREE.Vector3()).toArray(),
       jupiter: jupiterFrames.webb.getWorldPosition(new THREE.Vector3()).toArray(),
       mirror: hotspots.find(h => h.userData.part === 'mirror')?.getWorldPosition(new THREE.Vector3()).toArray() || null
     })
