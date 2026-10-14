@@ -25,6 +25,8 @@ import {createSpeedOfLight} from './exhibits/speed-of-light.js';
 import {createPrintingPress} from './exhibits/printing-press.js';
 import {createPeriodicTable} from './exhibits/periodic-table.js';
 import {createDoubleHelix} from './exhibits/double-helix.js';
+import {createContinentalDrift} from './exhibits/continental-drift.js';
+import {createMendel} from './exhibits/mendel.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
@@ -43,7 +45,7 @@ const WEBB = {x: 0, z: -2, turn: -Math.PI / 2};
 // through everything else in the rotunda, to look as close as they like.
 const ROPE = {along: 15.2, across: 8.9};
 // Where things stand round the wall, in degrees from the way in.
-const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108, elements: -150, helix: 152};
+const PLACES = {door: 0, galileo: -48, galileoView: 40, webbView: 55, romer: -100, press: 108, elements: -150, helix: 152, drift: 82, mendel: 129};
 // Where Jupiter is painted in Galileo's window, from the middle of its sill: the telescope points there.
 const JUPITER_IN_WINDOW = {x: .25, y: 3.0};
 const MOON_ORBITS = [5.9, 9.4, 15, 26.4];   // mean distances, Jupiter radii
@@ -269,7 +271,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   {
     // Each side names who stands beneath it, in the order a visitor facing it reads them.
     const quarters = [[180, 'MENDELEEV · 1869   ✦   THE INTERACTIVE MUSEUM   ✦   THE DOUBLE HELIX · 1953'], [-90, 'GALILEO · PADUA 1610   ✦   RØMER · PARIS 1676'],
-      [90, 'GUTENBERG · MAINZ 1450   ✦   WEBB · 2021'], [0, 'LOOK WHERE THEY LOOKED   ✦   DO WHAT THEY DID']];
+      [90, 'MENDEL · 1866   ✦   GUTENBERG · 1450   ✦   WEGENER · 1912   ✦   WEBB · 2021'], [0, 'LOOK WHERE THEY LOOKED   ✦   DO WHAT THEY DID']];
     // A quarter of the frieze is 34.5 m long and a metre high: 2,048 by 60 pixels keeps the letters square.
     for (const [angle, words] of quarters) {
       const c = document.createElement('canvas'); c.width = 2048; c.height = 60; const ctx = c.getContext('2d');
@@ -528,7 +530,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     }
   };
   const exhibits = [createSpeedOfLight(kit, {angle: PLACES.romer}), createPrintingPress(kit, {angle: PLACES.press}),
-    createPeriodicTable(kit, {angle: PLACES.elements}), createDoubleHelix(kit, {angle: PLACES.helix})];
+    createPeriodicTable(kit, {angle: PLACES.elements}), createDoubleHelix(kit, {angle: PLACES.helix}),
+    createContinentalDrift(kit, {angle: PLACES.drift}), createMendel(kit, {angle: PLACES.mendel})];
   const exhibit = Object.fromEntries(exhibits.map(e => [e.id, e]));
 
   // The medallions, one draw for each of their three parts.
