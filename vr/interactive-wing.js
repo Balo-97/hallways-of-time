@@ -33,6 +33,7 @@ import {createContinentalDrift} from './exhibits/continental-drift.js';
 import {createMendel} from './exhibits/mendel.js';
 import {createTuringMachine} from './exhibits/turing-machine.js';
 import {createSuSongClock} from './exhibits/su-song-clock.js';
+import {createTwoJupiters} from './exhibits/two-jupiters.js';
 
 /** World z of the gallery's centre. */
 export const WING_Z = 400;
@@ -129,7 +130,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   // Every panel the room can show, by kind; the exhibits add their own.
   const panelSpecs = {};
   const state = {nights: null, night: 0, mode: 'lens', seen: new Set(), part: null, panelKind: null,
-    webb: null, webbError: null, jupiter: null};
+    webb: null, webbError: null};
 
   // ── Materials and the small makers ───────────────────────────────────
   const std = (color, extra = {}) => new THREE.MeshStandardMaterial({color, roughness: .6, ...extra});
@@ -679,30 +680,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       ['Model: NASA, simplified for this museum', .74, .036, '#a99a7c', 'italic #px Georgia, serif']]));
     press(plate, () => openPart('webb'), 'Webb lectern');
   }
-  // Two Jupiters in one bay: as Galileo saw it on the left, as Webb sees it on the right.
-  const jupiterFrames = {galileo: null, webb: null};
-  {
-    const placeholder = document.createElement('canvas'); placeholder.width = placeholder.height = 4;
-    const bay = bayOf('jupiters').angle, y = 3.0;
-    // Webb's picture, 1646 by 1561 pixels. Each frame hangs flat against the curve where it is.
-    const wide = 2.9, tall = wide * 1561 / 1646, webbWall = onWall(beside(bay, .75), .1);
-    box(webbWall, [wide + .22, tall + .22, .1], [0, y, .02], M.gold);
-    jupiterFrames.webb = plane(webbWall, wide, tall, [0, y, .08], texture(placeholder));
-    press(jupiterFrames.webb, () => openJupiter(), 'Webb’s Jupiter');
-    plane(webbWall, wide + .2, .42, [0, y - tall / 2 - .38, .08], lettering(wide + .2, .42, [
-      ['JUPITER, SEEN BY WEBB · 27 JULY 2022', .12, .07, '#e1c393', '600 #px Arial, sans-serif'],
-      ['Infrared: auroras over both poles, high hazes, the Great Red Spot', .22, .055, '#f1ddba', 'italic #px Georgia, serif'],
-      [JUPITER_CREDIT, .33, .05, '#c4b898', '#px Arial, sans-serif']]));
-    const small = 1.5, galileoView = onWall(beside(bay, -2.05), .1);
-    box(galileoView, [small + .18, small + .18, .1], [0, y, .02], M.gold);
-    jupiterFrames.galileo = plane(galileoView, small, small, [0, y, .08], texture(placeholder));
-    press(jupiterFrames.galileo, () => openJupiter(), 'Galileo’s Jupiter');
-    plane(galileoView, small + .5, .42, [0, y - small / 2 - .38, .08], lettering(small + .5, .42, [
-      ['JUPITER, AS GALILEO SAW IT', .12, .07, '#e1c393', '600 #px Arial, sans-serif'],
-      ['7 January 1610, from Padua', .23, .055, '#f1ddba', 'italic #px Georgia, serif'],
-      ['Positions: JPL Horizons (NASA)', .33, .05, '#c4b898', '#px Arial, sans-serif']]));
-  }
-
   // ── The exhibitions, each its own module, built from the kit ──────────
   /**
    * What an exhibit is given to build itself with: the room's makers and
@@ -727,7 +704,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const exhibits = [createSpeedOfLight(kit, at('romer')), createPrintingPress(kit, at('gutenberg')),
     createPeriodicTable(kit, at('mendeleev')), createDoubleHelix(kit, at('dna')),
     createContinentalDrift(kit, at('wegener')), createMendel(kit, at('mendel')),
-    createTuringMachine(kit, at('turing')), createSuSongClock(kit, at('susong'))];
+    createTuringMachine(kit, at('turing')), createSuSongClock(kit, at('susong')),
+    createTwoJupiters(kit, {...at('jupiters'), nights: () => state.nights, drawLens, credit: JUPITER_CREDIT})];
   const exhibit = Object.fromEntries(exhibits.map(e => [e.id, e]));
 
   // ── The way in: a plan of the labs, and the way back ─────────────────
@@ -837,7 +815,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   const loading = {};
   function prepare() {
     loading.nights ??= fetch(new URL('../data/galileo-nights.json', import.meta.url)).then(r => r.ok ? r.json() : Promise.reject(new Error('the evenings could not be loaded')))
-      .then(data => { state.nights = data.nights; paintNotebook(); paintGalileoFrame(); if (state.panelKind === 'telescope') drawPanel(); })
+      .then(data => { state.nights = data.nights; paintNotebook(); if (state.panelKind === 'telescope') drawPanel(); })
       .catch(error => { loading.nights = null; console.warn('Galileo’s evenings could not be loaded:', error); });
     loading.webb ??= loadGLB(THREE, new URL('../assets/models/webb.glb', import.meta.url).href).then(model => {
       model.traverse(o => { if (o.isMesh) { o.matrixAutoUpdate = false; o.updateMatrix(); } });
@@ -855,14 +833,8 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       }
       callbacks.added?.(hotspots);
     }).catch(error => { state.webbError = error.message; loading.webb = null; console.warn('The Webb model could not be loaded:', error); });
-    loading.photo ??= new Promise(resolve => {
-      const image = new Image();
-      image.onload = () => { state.jupiter = image; const map = texture(image); jupiterFrames.webb.material.map = map; jupiterFrames.webb.material.needsUpdate = true; if (state.panelKind === 'jupiter') drawPanel(); resolve(); };
-      image.onerror = () => { loading.photo = null; resolve(); };
-      image.src = new URL('../assets/photos/webb-jupiter-2022.jpg', import.meta.url).href;
-    });
     for (const e of exhibits) if (e.prepare) loading[e.id] ??= e.prepare().catch(error => { loading[e.id] = null; console.warn(`The ${e.id} exhibit could not be loaded:`, error); });
-    return Promise.allSettled([loading.nights, loading.webb, loading.photo, ...exhibits.map(e => loading[e.id])]);
+    return Promise.allSettled([loading.nights, loading.webb, ...exhibits.map(e => loading[e.id])]);
   }
   /**
    * Which part of the Webb the visitor is pointing at: where the ray meets the
@@ -970,17 +942,9 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     });
     book.map.needsUpdate = true;
   }
-  function paintGalileoFrame() {
-    const c = document.createElement('canvas'); c.width = c.height = 768; const ctx = c.getContext('2d');
-    ctx.fillStyle = '#100d09'; ctx.fillRect(0, 0, 768, 768);
-    drawLens(ctx, 384, 360, 300, state.nights?.[0], {labels: false});
-    ctx.fillStyle = '#b3a98c'; ctx.font = '26px Arial'; ctx.textAlign = 'left'; ctx.fillText('◂ EAST', 70, 728); ctx.textAlign = 'right'; ctx.fillText('WEST ▸', 698, 728);
-    const old = jupiterFrames.galileo.material.map;
-    jupiterFrames.galileo.material.map = texture(c); jupiterFrames.galileo.material.needsUpdate = true; old?.dispose();
-  }
-  paintNotebook(); paintGalileoFrame();
+  paintNotebook();
 
-  // ── Panels: the eyepiece, a part of the Webb, two Jupiters ───────────
+  // ── Panels: the eyepiece and a part of the Webb ──────────────────────
   let panel = null, panelTargets = [];
   function wrapped(ctx, text, width) {
     const out = []; let line = '';
@@ -1035,25 +999,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
     ctx.fillText(`${partOrder().indexOf(state.part) + 1} OF ${partOrder().length}  ·  MODEL: NASA, SIMPLIFIED FOR HALLWAYS OF TIME`, 60, 950, 1080);
     return canvas;
   }
-  function paintJupiter() {
-    const {canvas, ctx} = board('JUPITER, FOUR HUNDRED YEARS APART', 'What Galileo saw, and what Webb sees');
-    drawLens(ctx, 300, 420, 200, state.nights?.[0], {labels: false});
-    ctx.fillStyle = '#d9bc7d'; ctx.font = '22px Arial'; ctx.fillText('GALILEO · 7 JANUARY 1610', 100, 680);
-    ctx.fillStyle = '#f1e5d0'; ctx.font = '24px Georgia';
-    wrapped(ctx, 'A small disc and points of light beside it, through a lens a few centimetres across.', 420).forEach((line, i) => ctx.fillText(line, 100, 716 + i * 32));
-    const image = state.jupiter;
-    if (image) {
-      const r = Math.min(470 / image.naturalWidth, 450 / image.naturalHeight), w = image.naturalWidth * r, h = image.naturalHeight * r;
-      ctx.drawImage(image, 640 + (470 - w) / 2, 200 + (450 - h) / 2, w, h);
-    } else { ctx.fillStyle = '#12160f'; ctx.fillRect(640, 200, 470, 450); }
-    ctx.fillStyle = '#b3a98c'; ctx.font = '17px Arial'; ctx.fillText(JUPITER_CREDIT, 640, 672, 520);
-    ctx.fillStyle = '#d9bc7d'; ctx.font = '22px Arial'; ctx.fillText('WEBB · 27 JULY 2022', 640, 712);
-    ctx.fillStyle = '#f1e5d0'; ctx.font = '24px Georgia';
-    wrapped(ctx, 'In infrared: auroras glowing over both poles, high hazes, and the Great Red Spot shining white.', 500).forEach((line, i) => ctx.fillText(line, 640, 748 + i * 32));
-    ctx.fillStyle = '#f1e5d0'; ctx.font = '27px Georgia';
-    wrapped(ctx, 'Both telescopes do what every telescope does: gather more light than an eye can. Galileo’s lens was a few centimetres across; Webb’s mirror is six and a half metres.', 1080).forEach((line, i) => ctx.fillText(line, 60, 868 + i * 36));
-    return canvas;
-  }
   function button(text, fn, i, count, tone = '#4b5640') {
     const c = document.createElement('canvas'); c.width = 768; c.height = 256; const ctx = c.getContext('2d');
     ctx.fillStyle = tone; ctx.fillRect(0, 0, 768, 256); ctx.fillStyle = '#eddfc4'; ctx.font = '62px Georgia';
@@ -1084,8 +1029,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   Object.assign(panelSpecs, {
     telescope: {paint: paintTelescope, actions: () => [['← EARLIER', () => stepNight(-1)],
       [state.mode === 'above' ? 'THE LENS' : 'FROM ABOVE', () => setMode(state.mode === 'above' ? 'lens' : 'above')], ['LATER →', () => stepNight(1)], ['CLOSE', closePanel]]},
-    part: {paint: paintPart, actions: () => [['← PART', () => stepPart(-1)], ['CLOSE', closePanel], ['PART →', () => stepPart(1)]]},
-    jupiter: {paint: paintJupiter, actions: () => [['CLOSE', closePanel]]}
+    part: {paint: paintPart, actions: () => [['← PART', () => stepPart(-1)], ['CLOSE', closePanel], ['PART →', () => stepPart(1)]]}
   });
   function disposePanel(group) {
     group.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.map?.dispose(); o.material.dispose(); } });
@@ -1119,7 +1063,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
   /** The parts the model has, to step through: the antenna and solar array are left out of it (scripts/make-webb.mjs). */
   const partOrder = () => PART_ORDER.filter(id => id === 'webb' || hotspots.some(h => h.userData.part === id));
   function stepPart(delta) { const order = partOrder(), i = order.indexOf(state.part); state.part = order[(Math.max(0, i) + delta + order.length) % order.length]; drawPanel(); }
-  function openJupiter() { prepare(); open('jupiter'); }
+  function openJupiter() { prepare(); exhibit.jupiters.open('pictures'); }
   function closePanel() { if (panel) { disposePanel(panel); panel = null; panelTargets = []; } state.panelKind = null; }
 
   // ── Where a visitor may stand ────────────────────────────────────────
@@ -1146,7 +1090,7 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       visibleMoons: night ? night.moons.map(visible) : [], east: night ? night.moons.map(m => m[0]) : [],
       part: state.part, webb: {loaded: !!state.webb, error: state.webbError, meshes, triangles, size: state.webb?.userData.size || null,
         parts: hotspots.map(h => h.userData.part)},
-      jupiterPhoto: !!state.jupiter, writing: !!galileoMoving.writing,
+      jupiterPhoto: exhibit.jupiters.getState().photo, writing: !!galileoMoving.writing,
       exhibits: Object.fromEntries(exhibits.map(e => [e.id, e.getState()])),
       controls: panelTargets.filter(m => m.userData.label).map(m => ({label: m.userData.label, target: m.getWorldPosition(new THREE.Vector3()).toArray()}))
     };
@@ -1168,7 +1112,6 @@ export function createInteractiveWing(THREE, scene, callbacks) {
       webbLectern: lectern.localToWorld(new THREE.Vector3(0, 1.34, .04)).toArray(),
       centre: group.localToWorld(new THREE.Vector3()).toArray(),
       map: mapDesk.localToWorld(new THREE.Vector3(0, 1.38, .06)).toArray(),
-      jupiter: jupiterFrames.webb.getWorldPosition(new THREE.Vector3()).toArray(),
       mirror: hotspots.find(h => h.userData.part === 'mirror')?.getWorldPosition(new THREE.Vector3()).toArray() || null,
       ...Object.assign({}, ...exhibits.map(e => e.targets?.() || {}))
     })
